@@ -1,0 +1,245 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../data/models/user.dart';
+import '../../core/services/clerk_auth_service_hosted.dart';
+import '../../core/services/convex_client_service.dart';
+import '../../core/providers/service_providers.dart';
+
+/// Auth state
+class AuthState {
+  final User? user;
+  final bool isLoading;
+  final String? error;
+  final bool isAuthenticated;
+
+  const AuthState({
+    this.user,
+    this.isLoading = false,
+    this.error,
+    this.isAuthenticated = false,
+  });
+
+  AuthState copyWith({
+    User? user,
+    bool? isLoading,
+    String? error,
+    bool? isAuthenticated,
+  }) {
+    return AuthState(
+      user: user ?? this.user,
+      isLoading: isLoading ?? this.isLoading,
+      error: error,
+      isAuthenticated: isAuthenticated ?? this.isAuthenticated,
+    );
+  }
+}
+
+/// Auth provider
+class AuthNotifier extends StateNotifier<AuthState> {
+  final ClerkAuthService _clerkAuthService;
+  final ConvexClientService _convexClient;
+
+  AuthNotifier(this._clerkAuthService, this._convexClient)
+      : super(const AuthState()) {
+    _checkExistingSession();
+  }
+
+  /// Check for existing authentication session
+  Future<void> _checkExistingSession() async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      final isAuth = await _clerkAuthService.isAuthenticated();
+
+      if (isAuth) {
+        final clerkUser = await _clerkAuthService.getCurrentUser();
+
+        if (clerkUser != null) {
+          // Set auth token for Convex
+          final token = await _clerkAuthService.getSessionToken();
+          if (token != null) {
+            _convexClient.setAuthToken(token);
+          }
+
+          // Convert Clerk user to app User model
+          final user = User(
+            id: clerkUser.id,
+            clerkId: clerkUser.id,
+            email: clerkUser.email ?? '',
+            name: clerkUser.fullName,
+            role: UserRole.supportWorker,
+            active: true,
+            createdAt: DateTime.now(),
+            updatedAt: DateTime.now(),
+            lastLogin: DateTime.now(),
+          );
+
+          state = state.copyWith(
+            user: user,
+            isLoading: false,
+            isAuthenticated: true,
+          );
+          return;
+        }
+      }
+
+      state = state.copyWith(isLoading: false);
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Sign in with Clerk hosted page
+  Future<void> signInWithHostedPage() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Sign in using Clerk's hosted page
+      final clerkUser = await _clerkAuthService.signInWithHostedPage();
+
+      // Get session token
+      final token = await _clerkAuthService.getSessionToken();
+      if (token != null) {
+        _convexClient.setAuthToken(token);
+      }
+
+      // Convert Clerk user to app User model
+      final user = User(
+        id: clerkUser.id,
+        clerkId: clerkUser.id,
+        email: clerkUser.email ?? '',
+        name: clerkUser.fullName,
+        role: UserRole.supportWorker,
+        active: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        lastLogin: DateTime.now(),
+      );
+
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        isAuthenticated: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Sign in with Google
+  Future<void> signInWithGoogle() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Sign in with Google OAuth
+      final clerkUser = await _clerkAuthService.signInWithGoogle();
+
+      // Get session token
+      final token = await _clerkAuthService.getSessionToken();
+      if (token != null) {
+        _convexClient.setAuthToken(token);
+      }
+
+      // Convert Clerk user to app User model
+      final user = User(
+        id: clerkUser.id,
+        clerkId: clerkUser.id,
+        email: clerkUser.email ?? '',
+        name: clerkUser.fullName,
+        role: UserRole.supportWorker,
+        active: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        lastLogin: DateTime.now(),
+      );
+
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        isAuthenticated: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Sign in with Apple
+  Future<void> signInWithApple() async {
+    state = state.copyWith(isLoading: true, error: null);
+
+    try {
+      // Sign in with Apple OAuth
+      final clerkUser = await _clerkAuthService.signInWithApple();
+
+      // Get session token
+      final token = await _clerkAuthService.getSessionToken();
+      if (token != null) {
+        _convexClient.setAuthToken(token);
+      }
+
+      // Convert Clerk user to app User model
+      final user = User(
+        id: clerkUser.id,
+        clerkId: clerkUser.id,
+        email: clerkUser.email ?? '',
+        name: clerkUser.fullName,
+        role: UserRole.supportWorker,
+        active: true,
+        createdAt: DateTime.now(),
+        updatedAt: DateTime.now(),
+        lastLogin: DateTime.now(),
+      );
+
+      state = state.copyWith(
+        user: user,
+        isLoading: false,
+        isAuthenticated: true,
+      );
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Sign out
+  Future<void> signOut() async {
+    state = state.copyWith(isLoading: true);
+
+    try {
+      // Sign out from Clerk
+      await _clerkAuthService.signOut();
+
+      // Clear Convex auth token
+      _convexClient.clearAuthToken();
+
+      state = const AuthState();
+    } catch (e) {
+      state = state.copyWith(
+        isLoading: false,
+        error: e.toString(),
+      );
+    }
+  }
+
+  /// Clear error
+  void clearError() {
+    state = state.copyWith(error: null);
+  }
+}
+
+/// Auth provider instance
+final authProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
+  final clerkAuth = ref.watch(clerkAuthServiceProvider);
+  final convexClient = ref.watch(convexClientProvider);
+  return AuthNotifier(clerkAuth, convexClient);
+});
