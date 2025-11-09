@@ -61,6 +61,9 @@ class ApiConfig {
   static const String shiftNotesGet = 'shiftNotes:get';
   static const String shiftNotesList = 'shiftNotes:list';
   static const String shiftNotesUpdate = 'shiftNotes:update';
+  static const String shiftNotesDelete = 'shiftNotes:remove';
+  static const String shiftNotesSubmit = 'shiftNotes:submit';
+  static const String shiftNotesFormat = 'shiftNotes:format';
   static const String shiftNotesSaveFormatted = 'shiftNotes:saveFormatted';
   static const String shiftNotesGetRecent = 'shiftNotes:getRecent';
   static const String shiftNotesGetForWeek = 'shiftNotes:getForWeek';
@@ -69,4 +72,13 @@ class ApiConfig {
   static const String dashboardGet = 'dashboard:getDashboard';
   static const String dashboardGetClientSummary = 'dashboard:getClientSummary';
   static const String dashboardGetStatistics = 'dashboard:getStatistics';
+
+  // Auth / Users
+  static const String authGetCurrentUser = 'auth:getCurrentUser';
+  static const String authGetUserProfile = 'auth:getUserProfile';
+  static const String authSyncUserFromClerk = 'auth:syncUserFromClerk';
+  static const String authUpdateProfile = 'auth:updateProfile';
+  static const String authUpdateLastLogin = 'auth:updateLastLogin';
+  static const String authEmailExists = 'auth:emailExists';
+  static const String authLinkStakeholder = 'auth:linkStakeholder';
 }

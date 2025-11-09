@@ -2,6 +2,8 @@ import '../../core/config/api_config.dart';
 import '../../core/services/convex_client_service.dart';
 import '../models/client.dart';
 import '../models/activity.dart';
+import '../models/goal.dart';
+import '../models/user.dart';
 
 /// MCP API Service (Convex Backend)
 /// Handles all communication with Convex functions
@@ -9,6 +11,84 @@ class McpApiService {
   final ConvexClientService _convexClient;
 
   McpApiService(this._convexClient);
+
+  // ==================== AUTH / USERS ====================
+
+  /// Get current user profile from Convex
+  /// Calls Convex function: auth:getCurrentUser
+  /// Requires clerk_id (stored locally after login)
+  Future<User> getCurrentUser({required String clerkId}) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.authGetCurrentUser,
+      args: {'clerk_id': clerkId},
+    );
+
+    return User.fromJson(result);
+  }
+
+  /// Get user profile with stakeholder details
+  /// Calls Convex function: auth:getUserProfile
+  /// Requires clerk_id (stored locally after login)
+  Future<User> getUserProfile({required String clerkId}) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.authGetUserProfile,
+      args: {'clerk_id': clerkId},
+    );
+
+    return User.fromJson(result);
+  }
+
+  /// Sync user from Clerk to Convex
+  /// Calls Convex function: auth:syncUserFromClerk
+  /// Call this after successful Clerk login
+  Future<User> syncUserFromClerk({
+    required String clerkId,
+    required String email,
+    required String name,
+    String? imageUrl,
+  }) async {
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.authSyncUserFromClerk,
+      args: {
+        'clerk_id': clerkId,
+        'email': email,
+        'name': name,
+        if (imageUrl != null) 'image_url': imageUrl,
+      },
+    );
+
+    return User.fromJson(result);
+  }
+
+  /// Update user profile
+  /// Calls Convex function: auth:updateProfile
+  Future<User> updateUserProfile({
+    required String clerkId,
+    String? name,
+    String? imageUrl,
+  }) async {
+    final args = {
+      'clerk_id': clerkId,
+      if (name != null) 'name': name,
+      if (imageUrl != null) 'image_url': imageUrl,
+    };
+
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.authUpdateProfile,
+      args: args,
+    );
+
+    return User.fromJson(result);
+  }
+
+  /// Update last login timestamp
+  /// Calls Convex function: auth:updateLastLogin
+  Future<void> updateLastLogin(String clerkId) async {
+    await _convexClient.mutation(
+      ApiConfig.authUpdateLastLogin,
+      args: {'clerk_id': clerkId},
+    );
+  }
 
   // ==================== DASHBOARD ====================
 
@@ -55,7 +135,14 @@ class McpApiService {
     );
 
     return result
-        .map((json) => Client.fromJson(json as Map<String, dynamic>))
+        .map((json) {
+          final jsonMap = json as Map<String, dynamic>;
+          // If the data includes stats, return ClientWithStats
+          if (jsonMap.containsKey('active_goals') || jsonMap.containsKey('total_activities')) {
+            return ClientWithStats.fromJson(jsonMap);
+          }
+          return Client.fromJson(jsonMap);
+        })
         .toList();
   }
 
@@ -124,6 +211,45 @@ class McpApiService {
     );
 
     return Activity.fromJson(result);
+  }
+
+  /// List goals
+  /// Calls Convex function: goals:list
+  Future<List<Goal>> listGoals({
+    String? clientId,
+    String? status,
+    String? category,
+    bool? archived,
+    int? limit,
+    int? offset,
+  }) async {
+    final args = <String, dynamic>{};
+    if (clientId != null) args['client_id'] = clientId;
+    if (status != null) args['status'] = status;
+    if (category != null) args['category'] = category;
+    if (archived != null) args['archived'] = archived;
+    if (limit != null) args['limit'] = limit;
+    if (offset != null) args['offset'] = offset;
+
+    final result = await _convexClient.query<List<dynamic>>(
+      ApiConfig.goalsList,
+      args: args,
+    );
+
+    return result
+        .map((json) => Goal.fromJson(json as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Get goal by ID
+  /// Calls Convex function: goals:get
+  Future<Goal> getGoal(String goalId) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.goalsGet,
+      args: {'id': goalId},
+    );
+
+    return Goal.fromJson(result);
   }
 
   /// Create new activity
@@ -231,6 +357,174 @@ class McpApiService {
 
     return result.cast<Map<String, dynamic>>();
   }
+
+  /// Create a new shift note
+  /// Calls Convex function: shiftNotes:create
+  Future<Map<String, dynamic>> createShiftNote({
+    required String clientId,
+    required String userId,
+    required String shiftDate, // YYYY-MM-DD
+    required String startTime, // HH:MM
+    required String endTime, // HH:MM
+    List<String>? primaryLocations,
+    required String rawNotes,
+    String? formattedNote,
+    List<String>? activityIds,
+    List<Map<String, dynamic>>? goalsProgress,
+  }) async {
+    try {
+      final args = <String, dynamic>{
+        'client_id': clientId,
+        'user_id': userId,
+        'shift_date': shiftDate,
+        'start_time': startTime,
+        'end_time': endTime,
+        'raw_notes': rawNotes,
+      };
+
+      if (primaryLocations != null && primaryLocations.isNotEmpty) {
+        args['primary_locations'] = primaryLocations;
+      }
+      if (formattedNote != null && formattedNote.isNotEmpty) {
+        args['formatted_note'] = formattedNote;
+      }
+      if (activityIds != null && activityIds.isNotEmpty) {
+        args['activity_ids'] = activityIds;
+      }
+      if (goalsProgress != null && goalsProgress.isNotEmpty) {
+        args['goals_progress'] = goalsProgress;
+      }
+
+      print('🔄 Calling Convex mutation: ${ApiConfig.shiftNotesCreate}');
+      print('📦 Args: $args');
+
+      final result = await _convexClient.mutation<dynamic>(
+        ApiConfig.shiftNotesCreate,
+        args: args,
+      );
+
+      print('📥 Raw result: $result');
+      print('📥 Result type: ${result.runtimeType}');
+
+      // Handle null response
+      if (result == null) {
+        throw Exception('Convex returned null. Make sure your shiftNotes:create function exists and returns a value.');
+      }
+
+      // Handle non-map response
+      if (result is! Map<String, dynamic>) {
+        throw Exception('Convex returned unexpected type: ${result.runtimeType}. Expected Map<String, dynamic>.');
+      }
+
+      return result;
+    } catch (e) {
+      print('❌ Error in createShiftNote: $e');
+      rethrow;
+    }
+  }
+
+  /// Update an existing shift note
+  /// Calls Convex function: shiftNotes:update
+  Future<Map<String, dynamic>> updateShiftNote({
+    required String shiftNoteId,
+    String? userId,
+    String? shiftDate,
+    String? startTime,
+    String? endTime,
+    List<String>? primaryLocations,
+    String? rawNotes,
+    String? formattedNote,
+    List<String>? activityIds,
+    List<Map<String, dynamic>>? goalsProgress,
+  }) async {
+    final args = <String, dynamic>{
+      'id': shiftNoteId, // Changed from 'shift_note_id' to 'id' to match Convex validator
+    };
+
+    if (userId != null) args['user_id'] = userId;
+    if (shiftDate != null) args['shift_date'] = shiftDate;
+    if (startTime != null) args['start_time'] = startTime;
+    if (endTime != null) args['end_time'] = endTime;
+    if (primaryLocations != null) args['primary_locations'] = primaryLocations;
+    if (rawNotes != null) args['raw_notes'] = rawNotes;
+    if (formattedNote != null) args['formatted_note'] = formattedNote;
+    if (activityIds != null) args['activity_ids'] = activityIds;
+    if (goalsProgress != null) args['goals_progress'] = goalsProgress;
+
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.shiftNotesUpdate,
+      args: args,
+    );
+
+    return result;
+  }
+
+  /// Delete a shift note
+  /// Calls Convex function: shiftNotes:remove
+  Future<void> deleteShiftNote(String shiftNoteId) async {
+    await _convexClient.mutation(
+      ApiConfig.shiftNotesDelete,
+      args: {'id': shiftNoteId},
+    );
+  }
+
+  /// Submit a shift note (transition from draft to submitted)
+  /// Calls Convex function: shiftNotes:submit
+  Future<Map<String, dynamic>> submitShiftNote(String shiftNoteId) async {
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.shiftNotesSubmit,
+      args: {'id': shiftNoteId},
+    );
+
+    return result;
+  }
+
+  /// Get formatting prompt from Convex
+  /// Returns the prompt to send to Claude API
+  Future<Map<String, dynamic>> getFormattingPrompt({
+    String? shiftNoteId,
+    String? rawNotes,
+    String? clientId,
+    String? userId,
+  }) async {
+    final args = <String, dynamic>{};
+
+    if (shiftNoteId != null) {
+      args['id'] = shiftNoteId;
+    } else if (rawNotes != null) {
+      args['raw_notes'] = rawNotes;
+      if (clientId != null) args['client_id'] = clientId;
+      if (userId != null) args['user_id'] = userId;
+    } else {
+      throw ArgumentError('Either shiftNoteId or rawNotes is required');
+    }
+
+    // This is a QUERY, not a mutation
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.shiftNotesFormat,
+      args: args,
+    );
+
+    // Returns: { formatting_prompt, shift_note_id, client_name, user_name }
+    return result;
+  }
+
+  /// Save formatted shift note back to Convex
+  /// Calls Convex function: shiftNotes:saveFormatted
+  Future<Map<String, dynamic>> saveFormattedShiftNote({
+    required String shiftNoteId,
+    required String formattedNote,
+  }) async {
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.shiftNotesSaveFormatted,
+      args: {
+        'id': shiftNoteId,
+        'formatted_note': formattedNote,
+      },
+    );
+
+    return result;
+  }
 }
 
 /// Dashboard data model
@@ -257,10 +551,10 @@ class DashboardData {
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
     return DashboardData(
-      totalClients: json['total_clients'] as int,
-      activeClients: json['active_clients'] as int,
-      totalGoals: json['total_goals'] as int,
-      activeGoals: json['active_goals'] as int,
+      totalClients: (json['total_clients'] as num).toInt(),
+      activeClients: (json['active_clients'] as num).toInt(),
+      totalGoals: (json['total_goals'] as num).toInt(),
+      activeGoals: (json['active_goals'] as num).toInt(),
       goalsAtRisk: (json['goals_at_risk'] as List?)
               ?.cast<Map<String, dynamic>>() ??
           [],
@@ -290,10 +584,10 @@ class DashboardStatistics {
   factory DashboardStatistics.fromJson(Map<String, dynamic> json) {
     return DashboardStatistics(
       goalsByStatus: (json['goals_by_status'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, v as int)) ??
+              ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
           {},
       activitiesByType: (json['activities_by_type'] as Map<String, dynamic>?)
-              ?.map((k, v) => MapEntry(k, v as int)) ??
+              ?.map((k, v) => MapEntry(k, (v as num).toInt())) ??
           {},
     );
   }

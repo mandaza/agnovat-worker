@@ -4,8 +4,30 @@ import '../../../core/config/app_colors.dart';
 import '../../../data/models/client.dart';
 import '../../../data/models/goal.dart';
 import '../../../data/models/activity.dart';
-import '../../widgets/cards/goal_card.dart';
-import '../../widgets/cards/activity_card.dart';
+import '../../../core/providers/service_providers.dart';
+import '../../../core/config/api_config.dart';
+
+/// Provider for client goals list
+final _goalsListProvider = FutureProvider.autoDispose.family<List<Goal>, String>((ref, clientId) async {
+  final convexClient = ref.watch(convexClientProvider);
+  final result = await convexClient.query<List<dynamic>>(
+    ApiConfig.goalsList,
+    args: {'client_id': clientId, 'archived': false},
+  );
+  return result.map((json) => Goal.fromJson(json as Map<String, dynamic>)).toList();
+});
+
+/// Provider for client activities list
+final _activitiesListProvider = FutureProvider.autoDispose.family<List<Activity>, String>((ref, clientId) async {
+  final apiService = ref.watch(mcpApiServiceProvider);
+  return await apiService.listActivities(clientId: clientId, limit: 20);
+});
+
+/// Provider for client shift notes list
+final _shiftNotesListProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, clientId) async {
+  final apiService = ref.watch(mcpApiServiceProvider);
+  return await apiService.listShiftNotes(clientId: clientId, limit: 20);
+});
 
 /// Client Details Screen
 /// Displays limited client information for support workers
@@ -32,7 +54,7 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -79,6 +101,7 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
                   Tab(text: 'Overview'),
                   Tab(text: 'Goals'),
                   Tab(text: 'Activities'),
+                  Tab(text: 'Notes'),
                 ],
               ),
             ),
@@ -92,6 +115,7 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
                 _buildOverviewTab(),
                 _buildGoalsTab(),
                 _buildActivitiesTab(),
+                _buildNotesTab(),
               ],
             ),
           ),
@@ -375,33 +399,106 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
 
   /// Goals Tab
   Widget _buildGoalsTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle('Active Goals'),
-          const SizedBox(height: 12),
-          // TODO: Fetch goals from provider
-          _buildEmptyState('No goals available. Connect to goal provider to display goals.'),
-        ],
-      ),
+    // Fetch goals from Convex in real-time
+    return Consumer(
+      builder: (context, ref, child) {
+        final goalsAsync = ref.watch(
+          _goalsListProvider(widget.client.id),
+        );
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('Active Goals'),
+              const SizedBox(height: 12),
+              goalsAsync.when(
+                data: (goals) {
+                  if (goals.isEmpty) {
+                    return _buildEmptyState('No active goals for this client.');
+                  }
+                  return Column(
+                    children: goals.map((goal) => _buildGoalCard(goal)).toList(),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => _buildEmptyState('Error loading goals: $error'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
   /// Activities Tab
   Widget _buildActivitiesTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _buildSectionTitle('Recent Activities'),
-          const SizedBox(height: 12),
-          // TODO: Fetch activities from provider
-          _buildEmptyState('No activities available. Connect to activity provider to display activities.'),
-        ],
-      ),
+    // Fetch activities from Convex in real-time
+    return Consumer(
+      builder: (context, ref, child) {
+        final activitiesAsync = ref.watch(
+          _activitiesListProvider(widget.client.id),
+        );
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('Recent Activities'),
+              const SizedBox(height: 12),
+              activitiesAsync.when(
+                data: (activities) {
+                  if (activities.isEmpty) {
+                    return _buildEmptyState('No activities recorded for this client.');
+                  }
+                  return Column(
+                    children: activities.map((activity) => _buildActivityCard(activity)).toList(),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => _buildEmptyState('Error loading activities: $error'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  /// Notes Tab
+  Widget _buildNotesTab() {
+    // Fetch shift notes from Convex in real-time
+    return Consumer(
+      builder: (context, ref, child) {
+        final notesAsync = ref.watch(
+          _shiftNotesListProvider(widget.client.id),
+        );
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildSectionTitle('Shift Notes'),
+              const SizedBox(height: 12),
+              notesAsync.when(
+                data: (notes) {
+                  if (notes.isEmpty) {
+                    return _buildEmptyState('No shift notes recorded for this client.');
+                  }
+                  return Column(
+                    children: notes.map((note) => _buildShiftNoteCard(note)).toList(),
+                  );
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, stack) => _buildEmptyState('Error loading notes: $error'),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 
@@ -525,6 +622,256 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
       return parts[0][0].toUpperCase();
     }
     return '?';
+  }
+
+  /// Build goal card
+  Widget _buildGoalCard(Goal goal) {
+    Color statusColor;
+    switch (goal.status) {
+      case GoalStatus.achieved:
+        statusColor = AppColors.success;
+        break;
+      case GoalStatus.inProgress:
+        statusColor = AppColors.goldenAmber;
+        break;
+      case GoalStatus.notStarted:
+        statusColor = AppColors.textSecondary;
+        break;
+      case GoalStatus.onHold:
+      case GoalStatus.discontinued:
+        statusColor = AppColors.error;
+        break;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  goal.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '${goal.progressPercentage}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            goal.description,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                'Target: ${goal.targetDate}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build activity card
+  Widget _buildActivityCard(Activity activity) {
+    Color statusColor;
+    switch (activity.status) {
+      case ActivityStatus.completed:
+        statusColor = AppColors.success;
+        break;
+      case ActivityStatus.inProgress:
+        statusColor = AppColors.goldenAmber;
+        break;
+      case ActivityStatus.scheduled:
+        statusColor = AppColors.deepBrown;
+        break;
+      default:
+        statusColor = AppColors.textSecondary;
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  activity.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  activity.status.toString().split('.').last.toUpperCase(),
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: statusColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (activity.description != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              activity.description!,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.event, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                _formatDate(activity.createdAt),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build shift note card
+  Widget _buildShiftNoteCard(Map<String, dynamic> note) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(17),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.calendar_today, size: 16, color: AppColors.deepBrown),
+              const SizedBox(width: 8),
+              Text(
+                note['shift_date'] as String? ?? 'Unknown date',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                '${note['start_time']} - ${note['end_time']}',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          if (note['raw_notes'] != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              note['raw_notes'] as String,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Format date for display
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays == 0) {
+      return 'Today';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays} days ago';
+    } else {
+      return '${date.day}/${date.month}/${date.year}';
+    }
   }
 }
 

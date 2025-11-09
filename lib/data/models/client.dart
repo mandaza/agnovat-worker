@@ -8,6 +8,7 @@ class Client extends Equatable {
   final String? ndisNumber; // 11 digits
   final String? primaryContact;
   final String? supportNotes;
+  final String? imageUrl; // Profile/hero image URL
   final bool active;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -19,6 +20,7 @@ class Client extends Equatable {
     this.ndisNumber,
     this.primaryContact,
     this.supportNotes,
+    this.imageUrl,
     required this.active,
     required this.createdAt,
     required this.updatedAt,
@@ -43,6 +45,7 @@ class Client extends Equatable {
     String? ndisNumber,
     String? primaryContact,
     String? supportNotes,
+    String? imageUrl,
     bool? active,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -54,6 +57,7 @@ class Client extends Equatable {
       ndisNumber: ndisNumber ?? this.ndisNumber,
       primaryContact: primaryContact ?? this.primaryContact,
       supportNotes: supportNotes ?? this.supportNotes,
+      imageUrl: imageUrl ?? this.imageUrl,
       active: active ?? this.active,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -69,6 +73,7 @@ class Client extends Equatable {
       'ndis_number': ndisNumber,
       'primary_contact': primaryContact,
       'support_notes': supportNotes,
+      'image_url': imageUrl,
       'active': active,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
@@ -84,6 +89,7 @@ class Client extends Equatable {
       ndisNumber: json['ndis_number'] as String?,
       primaryContact: json['primary_contact'] as String?,
       supportNotes: json['support_notes'] as String?,
+      imageUrl: json['image_url'] as String?,
       active: json['active'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
@@ -98,6 +104,7 @@ class Client extends Equatable {
         ndisNumber,
         primaryContact,
         supportNotes,
+        imageUrl,
         active,
         createdAt,
         updatedAt,
@@ -118,6 +125,7 @@ class ClientWithStats extends Client {
     super.ndisNumber,
     super.primaryContact,
     super.supportNotes,
+    super.imageUrl,
     required super.active,
     required super.createdAt,
     required super.updatedAt,
@@ -135,11 +143,12 @@ class ClientWithStats extends Client {
       ndisNumber: json['ndis_number'] as String?,
       primaryContact: json['primary_contact'] as String?,
       supportNotes: json['support_notes'] as String?,
+      imageUrl: json['image_url'] as String?,
       active: json['active'] as bool,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
-      activeGoalsCount: json['active_goals'] as int? ?? 0,
-      totalActivitiesCount: json['total_activities'] as int? ?? 0,
+      activeGoalsCount: (json['active_goals'] as num?)?.toInt() ?? 0,
+      totalActivitiesCount: (json['total_activities'] as num?)?.toInt() ?? 0,
       lastActivityDate: json['last_activity_date'] != null
           ? DateTime.parse(json['last_activity_date'] as String)
           : null,

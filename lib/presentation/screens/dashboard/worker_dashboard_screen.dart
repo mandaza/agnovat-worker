@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/activity.dart';
+import '../../../data/models/client.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../profile/profile_screen.dart';
+import '../clients/client_details_screen.dart';
+import '../activities/activities_list_screen.dart';
+import '../shift_notes/shift_notes_list_screen.dart';
+import '../ai_assistant/ai_assistant_screen.dart';
 
 /// Worker Dashboard Screen
 class WorkerDashboardScreen extends ConsumerWidget {
@@ -12,8 +18,90 @@ class WorkerDashboardScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authProvider).user;
+    final authState = ref.watch(authProvider);
     final dashboardState = ref.watch(dashboardProvider);
+
+    // Show loading while initializing auth
+    if (authState.isLoading) {
+      return const Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Loading profile...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show error if auth failed
+    if (authState.error != null && !authState.isAuthenticated) {
+      return Scaffold(
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppColors.error,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Authentication Error',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  authState.error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(authProvider.notifier).refresh();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Retry'),
+                ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: () async {
+                    // Sign out and navigate to sign-in
+                    final clerkAuth = ClerkAuth.of(context);
+                    await clerkAuth.signOut();
+                    if (context.mounted) {
+                      Navigator.of(context).popUntil((route) => route.isFirst);
+                    }
+                  },
+                  child: const Text(
+                    'Sign Out',
+                    style: TextStyle(color: AppColors.error),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
@@ -21,7 +109,12 @@ class WorkerDashboardScreen extends ConsumerWidget {
           ? const Center(child: CircularProgressIndicator())
           : dashboardState.error != null
               ? _buildError(context, dashboardState.error!)
-              : _buildDashboardContent(context, ref, dashboardState, user?.name),
+              : _buildDashboardContent(
+                  context,
+                  ref,
+                  dashboardState,
+                  authState.user?.name ?? 'User',
+                ),
       bottomNavigationBar: _buildBottomNavigation(context),
       floatingActionButton: _buildFloatingAIButton(context),
     );
@@ -132,7 +225,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // Header with app name and profile button
+  // Header with user details and profile avatar
   Widget _buildHeader(BuildContext context, String? userName) {
     return Container(
       decoration: BoxDecoration(
@@ -150,53 +243,144 @@ class WorkerDashboardScreen extends ConsumerWidget {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Agnovat',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  'Welcome back, ${userName ?? 'Worker'}',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-            Container(
-              width: 40,
-              height: 40,
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [AppColors.deepBrown, AppColors.burntOrange],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: const Icon(Icons.person, color: Colors.white, size: 20),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ProfileScreen(),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Agnovat',
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
                     ),
-                  );
-                },
-                padding: EdgeInsets.zero,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Welcome back, ${userName?.split(' ').first ?? 'User'}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  // Role badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: AppColors.deepBrown.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      'Support Worker',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.deepBrown,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            _buildProfileAvatar(context),
           ],
         ),
       ),
     );
+  }
+
+  // Profile avatar with image support
+  Widget _buildProfileAvatar(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final authState = ref.watch(authProvider);
+        final user = authState.user;
+
+        return GestureDetector(
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const ProfileScreen(),
+              ),
+            );
+          },
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [AppColors.deepBrown, AppColors.burntOrange],
+              ),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: AppColors.white,
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.deepBrown.withValues(alpha: 0.2),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: user?.imageUrl != null && user!.imageUrl!.isNotEmpty
+                  ? Image.network(
+                      user.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Fallback to initials if image fails to load
+                        return Center(
+                          child: Text(
+                            _getUserInitials(user.name),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 2,
+                          ),
+                        );
+                      },
+                    )
+                  : Center(
+                      child: Text(
+                        _getUserInitials(user?.name ?? 'User'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // Get user initials from name
+  String _getUserInitials(String name) {
+    final parts = name.split(' ');
+    if (parts.length >= 2) {
+      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+    } else if (parts.isNotEmpty) {
+      return parts[0][0].toUpperCase();
+    }
+    return '?';
   }
 
   // Assigned Client Card
@@ -219,15 +403,25 @@ class WorkerDashboardScreen extends ConsumerWidget {
     }
 
     final client = state.assignedClients.first; // Show only first client
+    final goalsCount = client is ClientWithStats ? client.activeGoalsCount : null;
 
-    return Container(
-      padding: const EdgeInsets.all(17),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Row(
+    return InkWell(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ClientDetailsScreen(client: client),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Row(
         children: [
           // Avatar with gradient
           Container(
@@ -267,59 +461,47 @@ class WorkerDashboardScreen extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Active Client • Plan Review Due: Mar 15',
-                  style: TextStyle(
+                Text(
+                  'Age: ${client.age} years',
+                  style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        '3 Goals Active',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.goldenAmber,
-                        ),
+                const SizedBox(height: 8),
+                // Show goals count if available (ClientWithStats)
+                if (goalsCount != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldenAmber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      '$goalsCount ${goalsCount == 1 ? 'Goal' : 'Goals'} Active',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.goldenAmber,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppColors.deepBrown.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        'Next Shift: Today 2pm',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.deepBrown,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+                  ),
               ],
             ),
           ),
         ],
+      ),
       ),
     );
   }
 
   // Quick Stats 2x2 Grid
   Widget _buildQuickStatsGrid(BuildContext context, DashboardState state) {
+    // Get real data from state
+    final activitiesCount = _getActivitiesCount(state);
+    final goalsCount = _getTotalGoalsCount(state);
+    final submittedNotesCount = _getSubmittedNotesCount(state);
+
     return Column(
       children: [
         Row(
@@ -337,8 +519,8 @@ class WorkerDashboardScreen extends ConsumerWidget {
             Expanded(
               child: _buildStatCard(
                 icon: Icons.check_circle_outline,
-                value: '8',
-                label: 'Completed Activities',
+                value: '$activitiesCount',
+                label: 'Activities',
                 iconBgColor: AppColors.goldenAmber.withValues(alpha: 0.1),
                 iconColor: AppColors.goldenAmber,
               ),
@@ -351,8 +533,8 @@ class WorkerDashboardScreen extends ConsumerWidget {
             Expanded(
               child: _buildStatCard(
                 icon: Icons.trending_up,
-                value: '4',
-                label: 'Goals In Progress',
+                value: '$goalsCount',
+                label: 'Goals',
                 iconBgColor: AppColors.burntOrange.withValues(alpha: 0.1),
                 iconColor: AppColors.burntOrange,
               ),
@@ -361,8 +543,8 @@ class WorkerDashboardScreen extends ConsumerWidget {
             Expanded(
               child: _buildStatCard(
                 icon: Icons.description_outlined,
-                value: '${state.pendingShiftNotes}',
-                label: 'Pending Notes',
+                value: '$submittedNotesCount',
+                label: 'Submitted Notes',
                 iconBgColor: AppColors.grey100,
                 iconColor: AppColors.textPrimary,
               ),
@@ -371,6 +553,29 @@ class WorkerDashboardScreen extends ConsumerWidget {
         ),
       ],
     );
+  }
+
+  /// Get all activities count from dashboard data
+  int _getActivitiesCount(DashboardState state) {
+    if (state.data == null) return 0;
+    // Count all recent activities
+    return state.data!.recentActivities.length;
+  }
+
+  /// Get total goals count from dashboard data
+  int _getTotalGoalsCount(DashboardState state) {
+    if (state.data == null) return 0;
+    // Get total goals count from dashboard data
+    return state.data!.totalGoals;
+  }
+
+  /// Get submitted notes count from dashboard data
+  int _getSubmittedNotesCount(DashboardState state) {
+    if (state.data == null) return 0;
+    // Count only submitted shift notes
+    return state.data!.recentShiftNotes
+        .where((note) => note['status'] == 'submitted')
+        .length;
   }
 
   Widget _buildStatCard({
@@ -570,7 +775,11 @@ class WorkerDashboardScreen extends ConsumerWidget {
               label: 'Activities',
               isActive: false,
               onTap: () {
-                // TODO: Navigate to activities
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ActivitiesListScreen(),
+                  ),
+                );
               },
             ),
             _buildNavItem(
@@ -578,7 +787,11 @@ class WorkerDashboardScreen extends ConsumerWidget {
               label: 'Shift Notes',
               isActive: false,
               onTap: () {
-                // TODO: Navigate to shift notes
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const ShiftNotesListScreen(),
+                  ),
+                );
               },
             ),
           ],
@@ -647,9 +860,9 @@ class WorkerDashboardScreen extends ConsumerWidget {
             child: IconButton(
               icon: const Icon(Icons.chat_bubble, color: Colors.white, size: 28),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('AI Assistant - Coming soon!'),
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (context) => const AiAssistantScreen(),
                   ),
                 );
               },

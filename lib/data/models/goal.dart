@@ -110,7 +110,7 @@ class Goal extends Equatable {
       category: _parseGoalCategory(json['category'] as String),
       targetDate: json['target_date'] as String,
       status: _parseGoalStatus(json['status'] as String),
-      progressPercentage: json['progress_percentage'] as int,
+      progressPercentage: (json['progress_percentage'] as num).toInt(),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
       achievedAt: json['achieved_at'] != null

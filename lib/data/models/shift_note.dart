@@ -24,7 +24,7 @@ class GoalProgress extends Equatable {
     return GoalProgress(
       goalId: json['goal_id'] as String,
       progressNotes: json['progress_notes'] as String,
-      progressObserved: json['progress_observed'] as int,
+      progressObserved: (json['progress_observed'] as num).toInt(),
     );
   }
 
@@ -32,14 +32,31 @@ class GoalProgress extends Equatable {
   List<Object?> get props => [goalId, progressNotes, progressObserved];
 }
 
+/// Shift Note Status
+enum ShiftNoteStatus {
+  draft,
+  submitted;
+
+  String toJson() => name;
+
+  static ShiftNoteStatus fromJson(String value) {
+    return ShiftNoteStatus.values.firstWhere(
+      (status) => status.name == value,
+      orElse: () => ShiftNoteStatus.draft,
+    );
+  }
+}
+
 /// Shift Note model
 class ShiftNote extends Equatable {
   final String id;
   final String clientId;
-  final String stakeholderId;
+  final String userId;
   final String shiftDate; // ISO format: YYYY-MM-DD
   final String startTime; // HH:MM (24-hour)
   final String endTime; // HH:MM (24-hour)
+  final ShiftNoteStatus status; // draft or submitted
+  final DateTime? submittedAt; // When the note was submitted
   final List<String>? primaryLocations;
   final String rawNotes;
   final String? formattedNote;
@@ -51,10 +68,12 @@ class ShiftNote extends Equatable {
   const ShiftNote({
     required this.id,
     required this.clientId,
-    required this.stakeholderId,
+    required this.userId,
     required this.shiftDate,
     required this.startTime,
     required this.endTime,
+    this.status = ShiftNoteStatus.draft,
+    this.submittedAt,
     this.primaryLocations,
     required this.rawNotes,
     this.formattedNote,
@@ -64,28 +83,57 @@ class ShiftNote extends Equatable {
     required this.updatedAt,
   });
 
-  /// Check if this shift note can be edited (within 24 hours)
+  /// Check if this is a draft
+  bool get isDraft => status == ShiftNoteStatus.draft;
+
+  /// Check if this is submitted
+  bool get isSubmitted => status == ShiftNoteStatus.submitted;
+
+  /// Check if this shift note can be edited
+  /// - Drafts can always be edited
+  /// - Submitted notes can only be edited within 24 hours of shift date
   bool get canEdit {
+    if (isDraft) return true;
+
     final shiftDateTime = DateTime.parse(shiftDate);
     final hoursSinceShift = DateTime.now().difference(shiftDateTime).inHours;
     return hoursSinceShift < 24;
   }
 
-  /// Get hours remaining until edit window closes
-  int get hoursUntilEditExpires {
+  /// Check if this shift note can be deleted
+  /// - Drafts can always be deleted
+  /// - Submitted notes can only be deleted within 24 hours of shift date
+  bool get canDelete {
+    if (isDraft) return true;
+
     final shiftDateTime = DateTime.parse(shiftDate);
     final hoursSinceShift = DateTime.now().difference(shiftDateTime).inHours;
-    return 24 - hoursSinceShift;
+    return hoursSinceShift < 24;
+  }
+
+  /// Check if this shift note can be submitted
+  bool get canSubmit => isDraft && rawNotes.trim().isNotEmpty;
+
+  /// Get hours remaining until edit window closes (for submitted notes)
+  int? get hoursUntilEditExpires {
+    if (isDraft) return null;
+
+    final shiftDateTime = DateTime.parse(shiftDate);
+    final hoursSinceShift = DateTime.now().difference(shiftDateTime).inHours;
+    final remaining = 24 - hoursSinceShift;
+    return remaining > 0 ? remaining : 0;
   }
 
   /// Copy with method
   ShiftNote copyWith({
     String? id,
     String? clientId,
-    String? stakeholderId,
+    String? userId,
     String? shiftDate,
     String? startTime,
     String? endTime,
+    ShiftNoteStatus? status,
+    DateTime? submittedAt,
     List<String>? primaryLocations,
     String? rawNotes,
     String? formattedNote,
@@ -97,10 +145,12 @@ class ShiftNote extends Equatable {
     return ShiftNote(
       id: id ?? this.id,
       clientId: clientId ?? this.clientId,
-      stakeholderId: stakeholderId ?? this.stakeholderId,
+      userId: userId ?? this.userId,
       shiftDate: shiftDate ?? this.shiftDate,
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
+      status: status ?? this.status,
+      submittedAt: submittedAt ?? this.submittedAt,
       primaryLocations: primaryLocations ?? this.primaryLocations,
       rawNotes: rawNotes ?? this.rawNotes,
       formattedNote: formattedNote ?? this.formattedNote,
@@ -116,10 +166,12 @@ class ShiftNote extends Equatable {
     return {
       'id': id,
       'client_id': clientId,
-      'stakeholder_id': stakeholderId,
+      'user_id': userId,
       'shift_date': shiftDate,
       'start_time': startTime,
       'end_time': endTime,
+      'status': status.toJson(),
+      'submitted_at': submittedAt?.toIso8601String(),
       'primary_locations': primaryLocations,
       'raw_notes': rawNotes,
       'formatted_note': formattedNote,
@@ -135,10 +187,16 @@ class ShiftNote extends Equatable {
     return ShiftNote(
       id: json['id'] as String,
       clientId: json['client_id'] as String,
-      stakeholderId: json['stakeholder_id'] as String,
+      userId: json['user_id'] as String,
       shiftDate: json['shift_date'] as String,
       startTime: json['start_time'] as String,
       endTime: json['end_time'] as String,
+      status: json['status'] != null
+          ? ShiftNoteStatus.fromJson(json['status'] as String)
+          : ShiftNoteStatus.draft,
+      submittedAt: json['submitted_at'] != null
+          ? DateTime.parse(json['submitted_at'] as String)
+          : null,
       primaryLocations: (json['primary_locations'] as List?)?.cast<String>(),
       rawNotes: json['raw_notes'] as String,
       formattedNote: json['formatted_note'] as String?,
@@ -155,10 +213,12 @@ class ShiftNote extends Equatable {
   List<Object?> get props => [
         id,
         clientId,
-        stakeholderId,
+        userId,
         shiftDate,
         startTime,
         endTime,
+        status,
+        submittedAt,
         primaryLocations,
         rawNotes,
         formattedNote,

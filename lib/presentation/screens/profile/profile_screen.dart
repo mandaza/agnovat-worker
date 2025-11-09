@@ -15,6 +15,110 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
+    // Show loading state
+    if (authState.isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        body: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text(
+                'Loading profile...',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show error state
+    if (authState.error != null) {
+      return Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        appBar: AppBar(
+          backgroundColor: AppColors.white,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          title: const Text(
+            'Profile',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 64,
+                  color: AppColors.error,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Failed to load profile',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  authState.error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(authProvider.notifier).refresh();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       body: CustomScrollView(
@@ -26,6 +130,58 @@ class ProfileScreen extends ConsumerWidget {
           SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 24),
+
+              // Show warning if no user data
+              if (user == null || user.email.isEmpty || user.email == 'No email')
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.goldenAmber.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.goldenAmber.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: AppColors.goldenAmber,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Profile Sync Required',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              const Text(
+                                'Please sign out and sign in again to sync your profile data.',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              if (user == null || user.email.isEmpty || user.email == 'No email')
+                const SizedBox(height: 16),
 
               // Profile Header Card
               Padding(
@@ -119,7 +275,7 @@ class ProfileScreen extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          // Avatar
+          // Avatar with image support
           Container(
             width: 100,
             height: 100,
@@ -134,16 +290,52 @@ class ProfileScreen extends ConsumerWidget {
                 color: AppColors.borderLight,
                 width: 4,
               ),
-            ),
-            child: Center(
-              child: Text(
-                _getInitials(user?.name ?? 'User'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 36,
-                  fontWeight: FontWeight.bold,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.deepBrown.withValues(alpha: 0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
+            ),
+            child: ClipOval(
+              child: user?.imageUrl != null && user!.imageUrl!.isNotEmpty
+                  ? Image.network(
+                      user.imageUrl!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Fallback to initials if image fails to load
+                        return Center(
+                          child: Text(
+                            _getInitials(user.name),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 36,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
+                        );
+                      },
+                    )
+                  : Center(
+                      child: Text(
+                        _getInitials(user?.name ?? 'User'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 16),
@@ -156,16 +348,18 @@ class ProfileScreen extends ConsumerWidget {
               fontWeight: FontWeight.bold,
               color: AppColors.textPrimary,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
 
           // Email
           Text(
-            user?.email ?? '',
+            user?.email ?? 'No email',
             style: const TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 12),
 
@@ -185,9 +379,132 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
           ),
+
+          // Account Info
+          if (user != null) ...[
+            const SizedBox(height: 20),
+            const Divider(),
+            const SizedBox(height: 12),
+
+            // Account Details Row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                // Member Since
+                _buildInfoColumn(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Member Since',
+                  value: _formatDate(user.createdAt),
+                ),
+                // Divider
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: AppColors.borderLight,
+                ),
+                // Last Login
+                _buildInfoColumn(
+                  icon: Icons.access_time_outlined,
+                  label: 'Last Login',
+                  value: user.lastLogin != null
+                      ? _formatLastLogin(user.lastLogin!)
+                      : 'Never',
+                ),
+                // Divider
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: AppColors.borderLight,
+                ),
+                // Account Status
+                _buildInfoColumn(
+                  icon: user.active
+                      ? Icons.check_circle_outline
+                      : Icons.cancel_outlined,
+                  label: 'Status',
+                  value: user.active ? 'Active' : 'Inactive',
+                  valueColor: user.active ? AppColors.success : AppColors.error,
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Build info column for account details
+  Widget _buildInfoColumn({
+    required IconData icon,
+    required String label,
+    required String value,
+    Color? valueColor,
+  }) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          size: 20,
+          color: valueColor ?? AppColors.deepBrown,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: valueColor ?? AppColors.textPrimary,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Format date to readable format
+  String _formatDate(DateTime date) {
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
+    ];
+    return '${months[date.month - 1]} ${date.year}';
+  }
+
+  /// Format last login to relative time
+  String _formatLastLogin(DateTime lastLogin) {
+    final now = DateTime.now();
+    final difference = now.difference(lastLogin);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays == 1) {
+      return 'Yesterday';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${lastLogin.day}/${lastLogin.month}/${lastLogin.year}';
+    }
   }
 
   /// Account Section

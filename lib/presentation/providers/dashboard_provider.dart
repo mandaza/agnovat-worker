@@ -1,179 +1,231 @@
+import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/service_providers.dart';
+import '../../data/services/mcp_api_service.dart';
 import '../../data/models/client.dart';
 import '../../data/models/activity.dart';
-import '../../data/repositories/dashboard_repository.dart';
 
-/// Dashboard state
+/// Dashboard state model
 class DashboardState {
-  final List<Client> assignedClients;
-  final List<Activity> todaysActivities;
-  final int pendingShiftNotes;
-  final int shiftsThisWeek;
   final bool isLoading;
   final String? error;
+  final List<Client> assignedClients;
+  final int shiftsThisWeek;
+  final int pendingShiftNotes;
+  final List<Activity> todaysActivities;
+  final DashboardData? data;
 
   const DashboardState({
-    this.assignedClients = const [],
-    this.todaysActivities = const [],
-    this.pendingShiftNotes = 0,
-    this.shiftsThisWeek = 0,
-    this.isLoading = false,
+    this.isLoading = true,
     this.error,
+    this.assignedClients = const [],
+    this.shiftsThisWeek = 0,
+    this.pendingShiftNotes = 0,
+    this.todaysActivities = const [],
+    this.data,
   });
 
   DashboardState copyWith({
-    List<Client>? assignedClients,
-    List<Activity>? todaysActivities,
-    int? pendingShiftNotes,
-    int? shiftsThisWeek,
     bool? isLoading,
     String? error,
+    List<Client>? assignedClients,
+    int? shiftsThisWeek,
+    int? pendingShiftNotes,
+    List<Activity>? todaysActivities,
+    DashboardData? data,
   }) {
     return DashboardState(
-      assignedClients: assignedClients ?? this.assignedClients,
-      todaysActivities: todaysActivities ?? this.todaysActivities,
-      pendingShiftNotes: pendingShiftNotes ?? this.pendingShiftNotes,
-      shiftsThisWeek: shiftsThisWeek ?? this.shiftsThisWeek,
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      assignedClients: assignedClients ?? this.assignedClients,
+      shiftsThisWeek: shiftsThisWeek ?? this.shiftsThisWeek,
+      pendingShiftNotes: pendingShiftNotes ?? this.pendingShiftNotes,
+      todaysActivities: todaysActivities ?? this.todaysActivities,
+      data: data ?? this.data,
     );
   }
 }
 
-/// Dashboard provider
-class DashboardNotifier extends StateNotifier<DashboardState> {
-  final DashboardRepository _repository;
+/// Dashboard state notifier with real-time updates
+class DashboardNotifier extends AutoDisposeNotifier<DashboardState> {
+  Timer? _refreshTimer;
 
-  DashboardNotifier(this._repository) : super(const DashboardState());
+  @override
+  DashboardState build() {
+    // Set up auto-refresh (every 30 seconds for real-time data)
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _fetchData();
+    });
 
-  /// Load dashboard data from MCP backend
-  Future<void> loadDashboard() async {
-    state = state.copyWith(isLoading: true, error: null);
+    // Clean up timer when disposed
+    ref.onDispose(() {
+      _refreshTimer?.cancel();
+    });
 
+    // Initial data fetch
+    _fetchData();
+
+    return const DashboardState();
+  }
+
+  /// Fetch dashboard data from Convex
+  Future<void> _fetchData() async {
     try {
-      // Fetch data from MCP backend
-      final clients = await _repository.getAssignedClients();
-      final activities = await _repository.getTodaysActivities();
-      final pendingNotes = await _repository.getPendingShiftNotesCount();
-      final shiftsCount = await _repository.getShiftsThisWeekCount();
-
+      final apiService = ref.read(mcpApiServiceProvider);
+      
+      // Fetch dashboard data
+      final dashboardData = await apiService.getDashboard();
+      
+      // Fetch active clients list (for assigned clients)
+      final clients = await apiService.listClients(active: true, limit: 5);
+      
+      // Update state with real-time data
       state = state.copyWith(
-        assignedClients: clients,
-        todaysActivities: activities,
-        pendingShiftNotes: pendingNotes,
-        shiftsThisWeek: shiftsCount,
         isLoading: false,
+        error: null,
+        assignedClients: clients,
+        shiftsThisWeek: 0, // TODO: Calculate from shift notes
+        pendingShiftNotes: dashboardData.recentShiftNotes.length,
+        todaysActivities: _filterTodaysActivities(dashboardData.recentActivities),
+        data: dashboardData,
       );
     } catch (e) {
-      // If API call fails, use mock data for development
-      // Remove this fallback once backend is fully integrated
-      _loadMockData();
-
       state = state.copyWith(
         isLoading: false,
-        error: 'Failed to load dashboard: ${e.toString()}',
+        error: e.toString(),
       );
     }
   }
 
-  /// Fallback to mock data (for development when backend is not available)
-  void _loadMockData() {
-    final mockClients = _generateMockClients();
-    final mockActivities = _generateMockActivities();
-
-    state = state.copyWith(
-      assignedClients: mockClients,
-      todaysActivities: mockActivities,
-      pendingShiftNotes: 2,
-      shiftsThisWeek: 12,
-    );
-  }
-
-  /// Generate mock clients
-  List<Client> _generateMockClients() {
+  /// Filter activities for today
+  List<Activity> _filterTodaysActivities(List<Activity> activities) {
     final now = DateTime.now();
-    return [
-      Client(
-        id: '1',
-        name: 'John Smith',
-        dateOfBirth: '1990-05-15',
-        ndisNumber: '12345678901',
-        active: true,
-        createdAt: now.subtract(const Duration(days: 90)),
-        updatedAt: now,
-      ),
-      Client(
-        id: '2',
-        name: 'Sarah Johnson',
-        dateOfBirth: '1985-08-22',
-        ndisNumber: '98765432109',
-        active: true,
-        createdAt: now.subtract(const Duration(days: 60)),
-        updatedAt: now,
-      ),
-      Client(
-        id: '3',
-        name: 'Michael Brown',
-        dateOfBirth: '1992-12-10',
-        active: true,
-        createdAt: now.subtract(const Duration(days: 30)),
-        updatedAt: now,
-      ),
-    ];
+    final today = DateTime(now.year, now.month, now.day);
+    
+    return activities.where((activity) {
+      final activityDate = activity.createdAt;
+      final activityDay = DateTime(
+        activityDate.year,
+        activityDate.month,
+        activityDate.day,
+      );
+      return activityDay.isAtSameMomentAs(today);
+    }).toList();
   }
 
-  /// Generate mock activities
-  List<Activity> _generateMockActivities() {
-    final now = DateTime.now();
-    return [
-      Activity(
-        id: '1',
-        clientId: '1',
-        stakeholderId: 'worker-1',
-        title: 'Life Skills - Shopping',
-        description: 'Assist with grocery shopping',
-        activityType: ActivityType.lifeSkills,
-        status: ActivityStatus.scheduled,
-        createdAt: now.subtract(const Duration(hours: 2)),
-        updatedAt: now,
-      ),
-      Activity(
-        id: '2',
-        clientId: '2',
-        stakeholderId: 'worker-1',
-        title: 'Social & Community Activity',
-        description: 'Visit local community center',
-        activityType: ActivityType.socialRecreation,
-        status: ActivityStatus.scheduled,
-        createdAt: now.subtract(const Duration(hours: 1)),
-        updatedAt: now,
-      ),
-      Activity(
-        id: '3',
-        clientId: '3',
-        stakeholderId: 'worker-1',
-        title: 'Personal Care Support',
-        description: 'Assist with daily routine',
-        activityType: ActivityType.personalCare,
-        status: ActivityStatus.inProgress,
-        createdAt: now.subtract(const Duration(minutes: 30)),
-        updatedAt: now,
-      ),
-    ];
-  }
-
-  /// Refresh dashboard
+  /// Manually refresh dashboard data
   Future<void> refresh() async {
-    await loadDashboard();
+    state = state.copyWith(isLoading: true);
+    await _fetchData();
   }
 }
 
-/// Dashboard provider instance
-final dashboardProvider = StateNotifierProvider<DashboardNotifier, DashboardState>((ref) {
-  final repository = ref.watch(dashboardRepositoryProvider);
-  final notifier = DashboardNotifier(repository);
-  // Auto-load dashboard on creation
-  Future.microtask(() => notifier.loadDashboard());
-  return notifier;
+/// Main dashboard provider with real-time updates
+final dashboardProvider = AutoDisposeNotifierProvider<DashboardNotifier, DashboardState>(
+  DashboardNotifier.new,
+);
+
+/// Dashboard data provider with auto-refresh (kept for backward compatibility)
+/// Fetches real-time dashboard data from Convex
+final dashboardDataProvider = StreamProvider.autoDispose<DashboardData>((ref) {
+  final apiService = ref.watch(mcpApiServiceProvider);
+  
+  // Create a stream controller for dashboard updates
+  final controller = StreamController<DashboardData>();
+  
+  // Auto-refresh interval (every 30 seconds)
+  const refreshInterval = Duration(seconds: 30);
+  Timer? timer;
+  
+  // Fetch data immediately
+  void fetchData() async {
+    try {
+      final data = await apiService.getDashboard();
+      if (!controller.isClosed) {
+        controller.add(data);
+      }
+    } catch (e) {
+      if (!controller.isClosed) {
+        controller.addError(e);
+      }
+    }
+  }
+  
+  // Initial fetch
+  fetchData();
+  
+  // Set up periodic refresh
+  timer = Timer.periodic(refreshInterval, (_) {
+    fetchData();
+  });
+  
+  // Clean up when provider is disposed
+  ref.onDispose(() {
+    timer?.cancel();
+    controller.close();
+  });
+  
+  return controller.stream;
+});
+
+/// Dashboard statistics provider (derived from dashboard data)
+final dashboardStatsProvider = Provider.autoDispose<AsyncValue<DashboardStatistics>>((ref) {
+  final dashboardAsync = ref.watch(dashboardDataProvider);
+  
+  return dashboardAsync.when(
+    data: (data) => AsyncValue.data(data.statistics),
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+  );
+});
+
+/// Active clients count provider
+final activeClientsCountProvider = Provider.autoDispose<AsyncValue<int>>((ref) {
+  final dashboardAsync = ref.watch(dashboardDataProvider);
+  
+  return dashboardAsync.when(
+    data: (data) => AsyncValue.data(data.activeClients),
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+  );
+});
+
+/// Goals at risk provider
+final goalsAtRiskProvider = Provider.autoDispose<AsyncValue<List<Map<String, dynamic>>>>((ref) {
+  final dashboardAsync = ref.watch(dashboardDataProvider);
+  
+  return dashboardAsync.when(
+    data: (data) => AsyncValue.data(data.goalsAtRisk),
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+  );
+});
+
+/// Recent activities provider
+final recentActivitiesProvider = Provider.autoDispose<AsyncValue<List<dynamic>>>((ref) {
+  final dashboardAsync = ref.watch(dashboardDataProvider);
+  
+  return dashboardAsync.when(
+    data: (data) => AsyncValue.data(data.recentActivities),
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+  );
+});
+
+/// Recent shift notes provider
+final recentShiftNotesProvider = Provider.autoDispose<AsyncValue<List<Map<String, dynamic>>>>((ref) {
+  final dashboardAsync = ref.watch(dashboardDataProvider);
+  
+  return dashboardAsync.when(
+    data: (data) => AsyncValue.data(data.recentShiftNotes),
+    loading: () => const AsyncValue.loading(),
+    error: (error, stack) => AsyncValue.error(error, stack),
+  );
+});
+
+/// Manual refresh trigger for dashboard
+final dashboardRefreshProvider = Provider<void Function()>((ref) {
+  return () {
+    ref.invalidate(dashboardDataProvider);
+  };
 });

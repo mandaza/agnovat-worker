@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clerk_auth/clerk_auth.dart' as clerk;
 import 'package:clerk_flutter/clerk_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_colors.dart';
+import '../../../core/providers/service_providers.dart';
 import '../../widgets/common/app_logo.dart';
 
 /// Custom sign-in screen using Clerk authentication
@@ -47,18 +49,68 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     setState(() => _loading = true);
 
     try {
+      // Step 1: Sign in with Clerk
       await widget.authState.attemptSignIn(
         strategy: clerk.Strategy.password,
         identifier: _emailController.text.trim(),
         password: _passwordController.text,
       );
-      // If successful, ClerkAuthBuilder will rebuild to signed-in state
+
+      // Step 2: After successful Clerk login, get user info and save clerk_id
+      await _syncUserToConvex();
+
+      // ClerkAuthBuilder will rebuild to signed-in state
     } on clerk.AuthError catch (e) {
       _showError(e.message);
     } catch (e) {
       _showError('Sign in failed: $e');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  /// Sync user from Clerk to Convex and save clerk_id locally
+  /// This follows the stateless authentication architecture
+  Future<void> _syncUserToConvex() async {
+    try {
+      // Get Clerk user from ClerkAuth
+      final clerkAuth = ClerkAuth.of(context);
+      final clerkUser = clerkAuth.user;
+
+      if (clerkUser == null) {
+        throw Exception('Clerk user not found after sign-in');
+      }
+
+      // Extract user info from Clerk user object
+      // Note: Clerk Flutter SDK user properties may vary
+      final email = clerkUser.email ?? 'user@agnovat.com';
+      final name = clerkUser.name;
+      final imageUrl = clerkUser.imageUrl;
+
+      // Save user data to SharedPreferences (for immediate display)
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('clerk_user_id', clerkUser.id);
+      await prefs.setString('clerk_user_name', name);
+      await prefs.setString('clerk_user_email', email);
+      if (imageUrl != null) {
+        await prefs.setString('clerk_user_image_url', imageUrl);
+      }
+
+      // Sync user to Convex (create/update user in Convex database)
+      final apiService = ref.read(mcpApiServiceProvider);
+      
+      await apiService.syncUserFromClerk(
+        clerkId: clerkUser.id,
+        email: email,
+        name: name,
+        imageUrl: imageUrl,
+      );
+
+      // Update last login timestamp
+      await apiService.updateLastLogin(clerkUser.id);
+    } catch (e) {
+      // Log error but don't block login - user can still proceed
+      debugPrint('Failed to sync user to Convex: $e');
     }
   }
 
