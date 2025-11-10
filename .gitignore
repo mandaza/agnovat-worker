@@ -50,3 +50,10 @@ app.*.map.json
 !.env.example
 *.key
 **/secrets/
+
+# Android signing files - NEVER commit these!
+/android/key.properties
+/android/app/*.keystore
+/android/app/*.jks
+*.keystore
+*.jks

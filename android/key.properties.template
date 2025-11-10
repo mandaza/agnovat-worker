@@ -1,0 +1,23 @@
+# Android Release Signing Configuration Template
+#
+# INSTRUCTIONS:
+# 1. Generate your keystore using the command below
+# 2. Copy this file to 'key.properties' (remove .template)
+# 3. Fill in the values below with your actual keystore details
+# 4. NEVER commit key.properties to git (it's already in .gitignore)
+#
+# GENERATE KEYSTORE COMMAND:
+# keytool -genkey -v -keystore android/app/agnovat-release.keystore \
+#   -alias agnovat -keyalg RSA -keysize 2048 -validity 10000
+#
+# The command will ask for:
+# - Keystore password (save this securely!)
+# - Key password (can be same as keystore password)
+# - Your name/organization details
+#
+# After generating the keystore, fill in these properties:
+
+storePassword=YOUR_KEYSTORE_PASSWORD_HERE
+keyPassword=YOUR_KEY_PASSWORD_HERE
+keyAlias=agnovat
+storeFile=../app/agnovat-release.keystore

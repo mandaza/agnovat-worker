@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/convex_client_service.dart';
 import '../services/claude_api_service.dart';
+import '../services/secure_storage_service.dart';
 import '../../data/services/mcp_api_service.dart';
 import '../../data/repositories/dashboard_repository.dart';
 
@@ -33,6 +34,15 @@ final claudeApiServiceProvider = Provider<ClaudeApiService>((ref) {
   );
 
   return ClaudeApiService(apiKey: apiKey);
+});
+
+/// Secure Storage Service Provider
+/// Provides encrypted storage for sensitive user data
+/// Uses iOS Keychain and Android EncryptedSharedPreferences
+final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
+  final service = SecureStorageService();
+  service.initialize();
+  return service;
 });
 
 /// Dashboard Repository Provider

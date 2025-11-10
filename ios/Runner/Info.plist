@@ -58,5 +58,21 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<!-- Privacy Usage Descriptions - Required for App Store submission -->
+	<!-- Camera Access (for image_picker plugin) -->
+	<key>NSCameraUsageDescription</key>
+	<string>Agnovat needs camera access to capture photos for client documentation and support activities</string>
+	<!-- Photo Library Access (for image_picker plugin) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Agnovat needs photo library access to select images for client profiles and activity documentation</string>
+	<!-- Photo Library Add Usage -->
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Agnovat needs permission to save photos to your library</string>
+	<!-- User Tracking - Required even if not tracking -->
+	<key>NSUserTrackingUsageDescription</key>
+	<string>This app does not track your activity across other companies' apps or websites</string>
+	<!-- Local Network Access (for API calls) -->
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Agnovat needs network access to sync shift notes and client data with secure servers</string>
 </dict>
 </plist>

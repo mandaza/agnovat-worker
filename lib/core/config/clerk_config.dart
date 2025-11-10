@@ -1,13 +1,24 @@
 /// Clerk authentication configuration
 /// Using Frontend API for custom UI with OAuth support
+///
+/// IMPORTANT: Configure environment-specific values using --dart-define
+/// Example:
+///   flutter run --dart-define=CLERK_PUBLISHABLE_KEY=pk_live_xxx
+///              --dart-define=CLERK_FRONTEND_API=https://your-domain.clerk.accounts.dev
 class ClerkConfig {
   ClerkConfig._();
 
-  // Clerk Publishable Key (Test Environment)
-  static const String publishableKey = 'pk_test_dmVyaWZpZWQtc3RpbmdyYXktODEuY2xlcmsuYWNjb3VudHMuZGV2JA';
+  // Clerk Publishable Key (from environment)
+  static const String publishableKey = String.fromEnvironment(
+    'CLERK_PUBLISHABLE_KEY',
+    defaultValue: 'pk_test_dmVyaWZpZWQtc3RpbmdyYXktODEuY2xlcmsuYWNjb3VudHMuZGV2JA', // Test key for development
+  );
 
-  // Clerk Frontend API URL
-  static const String frontendApi = 'https://verified-stingray-81.accounts.dev';
+  // Clerk Frontend API URL (from environment)
+  static const String frontendApi = String.fromEnvironment(
+    'CLERK_FRONTEND_API',
+    defaultValue: 'https://verified-stingray-81.accounts.dev', // Test URL for development
+  );
 
   // OAuth Redirect Configuration
   static const String redirectScheme = 'agnovat';
