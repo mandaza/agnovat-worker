@@ -50,6 +50,15 @@ flutter pub get
 echo "📦 Pre-caching iOS artifacts..."
 flutter precache --ios
 
+echo "📦 Running flutter clean to ensure fresh build..."
+flutter clean
+
+echo "📦 Running flutter pub get again after clean..."
+flutter pub get
+
+echo "🔍 Checking iOS plugin symlinks..."
+ls -la "$REPO_PATH/ios/.symlinks/plugins/" || echo "⚠️  Plugin symlinks not yet created"
+
 # --------------------------------------
 # CocoaPods
 # --------------------------------------
@@ -59,10 +68,18 @@ if ! command -v pod >/dev/null 2>&1; then
 fi
 
 echo "📦 Running pod install..."
-cd ios
+cd "$REPO_PATH/ios"
 
-# Optional but safer for CI
+# Remove old Pods and regenerate
+rm -rf Pods Podfile.lock
+
+# Update pod repo for latest specs
 pod repo update
-pod install
+
+# Install with verbose output
+pod install --verbose
+
+echo "🔍 Verifying flutter_secure_storage pod..."
+ls -la Pods/flutter_secure_storage/ || echo "⚠️  flutter_secure_storage pod not found"
 
 echo "✅ ci_post_clone.sh setup complete!"
