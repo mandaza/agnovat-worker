@@ -1,51 +1,68 @@
 #!/bin/sh
-
-set -e
+set -euxo pipefail
 
 echo "======================================"
-echo "Xcode Cloud Post-Clone Setup"
+echo "Xcode Cloud Post-Clone Setup (Flutter)"
 echo "======================================"
 
 # Determine repository path
-if [ -z "$CI_PRIMARY_REPOSITORY_PATH" ]; then
-    REPO_PATH="${CI_WORKSPACE:-$(pwd)}"
+if [ -n "${CI_PRIMARY_REPOSITORY_PATH:-}" ]; then
+  REPO_PATH="$CI_PRIMARY_REPOSITORY_PATH"
+elif [ -n "${CI_WORKSPACE:-}" ]; then
+  REPO_PATH="$CI_WORKSPACE"
 else
-    REPO_PATH="$CI_PRIMARY_REPOSITORY_PATH"
+  REPO_PATH="$(pwd)"
 fi
 
 echo "Working directory: $REPO_PATH"
+ls -la "$REPO_PATH"
 
+# --------------------------------------
 # Install Flutter if not available
-if ! command -v flutter &> /dev/null; then
-    echo "📦 Installing Flutter..."
-    cd $HOME
-    git clone https://github.com/flutter/flutter.git -b stable --depth 1
-    export PATH="$HOME/flutter/bin:$PATH"
-    echo "✅ Flutter installed"
+# --------------------------------------
+if ! command -v flutter >/dev/null 2>&1; then
+  echo "📦 Installing Flutter (stable) ..."
+  cd "$HOME"
+
+  # Clean any previous install
+  rm -rf flutter
+
+  git clone https://github.com/flutter/flutter.git -b stable --depth 1
+  export PATH="$HOME/flutter/bin:$PATH"
+  echo "✅ Flutter installed at $HOME/flutter"
 else
-    echo "✅ Flutter found in system"
+  echo "✅ Flutter already available"
+  # Make sure bin directory is on PATH
+  export PATH="$HOME/flutter/bin:$PATH"
 fi
 
-# Show Flutter version
-echo "Flutter version:"
+echo "🔍 Flutter version:"
 flutter --version
 
-# Navigate to project root
+# --------------------------------------
+# Flutter dependencies
+# --------------------------------------
 cd "$REPO_PATH"
 
-# Get Flutter dependencies
 echo "📦 Running flutter pub get..."
-flutter pub get || {
-    echo "❌ flutter pub get failed"
-    exit 1
-}
+flutter pub get
 
-# Install CocoaPods dependencies
+echo "📦 Pre-caching iOS artifacts..."
+flutter precache --ios
+
+# --------------------------------------
+# CocoaPods
+# --------------------------------------
+if ! command -v pod >/dev/null 2>&1; then
+  echo "❌ CocoaPods (pod) command not found on this image."
+  exit 1
+fi
+
 echo "📦 Running pod install..."
 cd ios
-pod install || {
-    echo "❌ pod install failed"
-    exit 1
-}
 
-echo "✅ Setup complete!"
+# Optional but safer for CI
+pod repo update
+pod install
+
+echo "✅ ci_post_clone.sh setup complete!"
