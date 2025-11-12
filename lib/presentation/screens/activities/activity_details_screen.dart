@@ -524,7 +524,7 @@ class _ActivityDetailsScreenState
       );
 
       setState(() {
-        _activity = Activity.fromJson(updatedActivity);
+        _activity = updatedActivity;
       });
 
       // Close loading
@@ -578,7 +578,7 @@ class _ActivityDetailsScreenState
       );
 
       setState(() {
-        _activity = Activity.fromJson(updatedActivity);
+        _activity = updatedActivity;
       });
 
       // Close loading
