@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import '../../../core/config/app_colors.dart';
+import '../../../core/providers/service_providers.dart';
 import '../../../data/models/activity.dart';
 import '../../providers/dashboard_provider.dart';
 import '../shift_notes/create_shift_note_screen.dart';
@@ -62,11 +63,11 @@ class _ActivityDetailsScreenState
             _buildActivityInfoCard(context, clientName),
             const SizedBox(height: 24),
             _buildActivityDescriptionCard(context),
-            const SizedBox(height: 24),
-            _buildSessionObjectivesCard(context),
-            const SizedBox(height: 24),
-            _buildSupportNotesCard(context),
-            const SizedBox(height: 24),
+            if (_activity.description != null && _activity.description!.isNotEmpty)
+              const SizedBox(height: 24),
+            _buildOutcomeNotesCard(context),
+            if (_activity.outcomeNotes != null && _activity.outcomeNotes!.isNotEmpty)
+              const SizedBox(height: 24),
             _buildActionButtons(context),
             const SizedBox(height: 24),
           ],
@@ -172,9 +173,13 @@ class _ActivityDetailsScreenState
 
   /// Build activity info card
   Widget _buildActivityInfoCard(BuildContext context, String clientName) {
-    // Format time
-    final timeStr = 'Today • ${DateFormat('h:mm a').format(_activity.createdAt)} - ${DateFormat('h:mm a').format(_activity.createdAt.add(const Duration(hours: 2)))}';
-    final duration = '2 hours'; // Mock duration
+    // Format created date
+    final createdDate = DateFormat('MMM d, yyyy').format(_activity.createdAt);
+    final createdTime = DateFormat('h:mm a').format(_activity.createdAt);
+
+    // Format updated date
+    final updatedDate = DateFormat('MMM d, yyyy').format(_activity.updatedAt);
+    final updatedTime = DateFormat('h:mm a').format(_activity.updatedAt);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -196,31 +201,34 @@ class _ActivityDetailsScreenState
             ),
             const SizedBox(height: 16),
             _buildInfoRow(
-              icon: Icons.access_time,
+              icon: Icons.calendar_today_outlined,
               iconColor: const Color(0xFFD68630),
               iconBackgroundColor: const Color(0xFFD68630).withOpacity(0.1),
-              label: 'Time',
-              value: timeStr,
-              subtitle: 'Duration: $duration',
+              label: 'Created',
+              value: createdDate,
+              subtitle: 'at $createdTime',
             ),
             const SizedBox(height: 16),
             _buildInfoRow(
-              icon: Icons.location_on_outlined,
+              icon: Icons.update,
               iconColor: const Color(0xFF954406),
               iconBackgroundColor: const Color(0xFF954406).withOpacity(0.1),
-              label: 'Location',
-              value: 'Westfield Shopping Centre',
-              subtitle: '123 Main St, Melbourne VIC 3000',
+              label: 'Last Updated',
+              value: updatedDate,
+              subtitle: 'at $updatedTime',
             ),
-            const SizedBox(height: 16),
-            _buildInfoRow(
-              icon: Icons.flag_outlined,
-              iconColor: const Color(0xFF5A3111),
-              iconBackgroundColor: const Color(0xFF5A3111).withOpacity(0.1),
-              label: 'Linked Goal',
-              value: 'Independent Living Skills',
-              subtitle: 'Progress: 65%',
-            ),
+            if (_activity.goalIds != null && _activity.goalIds!.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                icon: Icons.flag_outlined,
+                iconColor: const Color(0xFF5A3111),
+                iconBackgroundColor: const Color(0xFF5A3111).withOpacity(0.1),
+                label: 'Linked Goals',
+                value: '${_activity.goalIds!.length} goal${_activity.goalIds!.length > 1 ? 's' : ''} linked',
+                subtitle: _activity.goalIds!.take(2).join(', ') +
+                         (_activity.goalIds!.length > 2 ? '...' : ''),
+              ),
+            ],
           ],
         ),
       ),
@@ -296,8 +304,10 @@ class _ActivityDetailsScreenState
 
   /// Build activity description card
   Widget _buildActivityDescriptionCard(BuildContext context) {
-    final description = _activity.description ?? 
-        'Support Tavonga in practicing independent shopping skills including selecting items from a list, comparing prices, using self-checkout, and managing payment. Focus on building confidence and developing strategies for navigating the shopping environment independently.';
+    // Only show if description exists
+    if (_activity.description == null || _activity.description!.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -323,7 +333,7 @@ class _ActivityDetailsScreenState
             ),
             const SizedBox(height: 12),
             Text(
-              description,
+              _activity.description!,
               style: const TextStyle(
                 fontFamily: 'Nunito',
                 fontSize: 14,
@@ -338,14 +348,12 @@ class _ActivityDetailsScreenState
     );
   }
 
-  /// Build session objectives card
-  Widget _buildSessionObjectivesCard(BuildContext context) {
-    final objectives = [
-      'Select 5 items from shopping list independently',
-      'Compare prices between at least 2 similar products',
-      'Complete transaction using self-checkout',
-      'Stay within allocated budget of \$50',
-    ];
+  /// Build outcome notes card (only if outcome notes exist)
+  Widget _buildOutcomeNotesCard(BuildContext context) {
+    // Only show if outcome notes exist
+    if (_activity.outcomeNotes == null || _activity.outcomeNotes!.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -359,89 +367,44 @@ class _ActivityDetailsScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Session Objectives',
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                height: 1.5,
-              ),
+            Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5A3111).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(100),
+                  ),
+                  child: const Icon(
+                    Icons.note_outlined,
+                    color: Color(0xFF5A3111),
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Outcome Notes',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 12),
-            ...objectives.map((objective) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(top: 2),
-                    width: 18,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.textSecondary.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      objective,
-                      style: const TextStyle(
-                        fontFamily: 'Nunito',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        color: AppColors.textPrimary,
-                        height: 1.43,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Build support notes card
-  Widget _buildSupportNotesCard(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Container(
-        padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.black.withOpacity(0.1)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Support Notes',
-              style: TextStyle(
+            Text(
+              _activity.outcomeNotes!,
+              style: const TextStyle(
                 fontFamily: 'Nunito',
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                height: 1.5,
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+                color: AppColors.textSecondary,
+                height: 1.625,
               ),
-            ),
-            const SizedBox(height: 12),
-            _buildSupportNoteItem(
-              'Communication',
-              'Tavonga prefers visual shopping lists with pictures',
-            ),
-            const SizedBox(height: 8),
-            _buildSupportNoteItem(
-              'Sensory Considerations',
-              'May need breaks if shopping center becomes too crowded or noisy',
             ),
           ],
         ),
@@ -449,42 +412,6 @@ class _ActivityDetailsScreenState
     );
   }
 
-  /// Build support note item
-  Widget _buildSupportNoteItem(String label, String content) {
-    return Container(
-      padding: const EdgeInsets.only(top: 12, left: 12, right: 12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF2F2F7),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-              height: 1.33,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            content,
-            style: const TextStyle(
-              fontFamily: 'Nunito',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textPrimary,
-              height: 1.43,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   /// Build action buttons
   Widget _buildActionButtons(BuildContext context) {
@@ -492,84 +419,206 @@ class _ActivityDetailsScreenState
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Column(
         children: [
-          // Complete Activity & Create Shift Note button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: () => _completeActivityAndCreateShiftNote(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF5A3111),
-                foregroundColor: Colors.white,
-                elevation: 2,
-                shadowColor: Colors.black.withOpacity(0.1),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          // Show different buttons based on activity status
+          if (_activity.status == ActivityStatus.scheduled) ...[
+            // Start Activity button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => _markAsInProgress(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5A3111),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shadowColor: Colors.black.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
-              ),
-              child: const Text(
-                'Complete Activity & Create Shift Note',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Mark as In Progress button
-          SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: OutlinedButton(
-              onPressed: () => _markAsInProgress(context),
-              style: OutlinedButton.styleFrom(
-                backgroundColor: AppColors.surfaceLight,
-                foregroundColor: AppColors.textPrimary,
-                side: BorderSide(
-                  color: Colors.black.withOpacity(0.1),
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-              ),
-              child: const Text(
-                'Mark as In Progress',
-                style: TextStyle(
-                  fontFamily: 'Nunito',
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                child: const Text(
+                  'Start Activity',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ),
-          ),
+          ] else if (_activity.status == ActivityStatus.inProgress) ...[
+            // Complete Activity button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => _completeActivityAndCreateShiftNote(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5A3111),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shadowColor: Colors.black.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'Complete Activity & Create Shift Note',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ] else if (_activity.status == ActivityStatus.completed) ...[
+            // View Shift Notes button
+            SizedBox(
+              width: double.infinity,
+              height: 56,
+              child: ElevatedButton(
+                onPressed: () => _viewShiftNotes(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5A3111),
+                  foregroundColor: Colors.white,
+                  elevation: 2,
+                  shadowColor: Colors.black.withOpacity(0.1),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: const Text(
+                  'View Shift Notes',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
 
   /// Complete activity and navigate to create shift note
-  void _completeActivityAndCreateShiftNote(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => const CreateShiftNoteScreen(),
+  Future<void> _completeActivityAndCreateShiftNote(BuildContext context) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
       ),
     );
+
+    try {
+      // Update activity status to completed
+      final apiService = ref.read(mcpApiServiceProvider);
+      final updatedActivity = await apiService.updateActivity(
+        activityId: _activity.id,
+        status: ActivityStatus.completed,
+      );
+
+      setState(() {
+        _activity = Activity.fromJson(updatedActivity);
+      });
+
+      // Close loading
+      if (context.mounted) Navigator.of(context).pop();
+
+      // Navigate to create shift note
+      if (context.mounted) {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => const CreateShiftNoteScreen(),
+          ),
+        );
+      }
+
+      // Refresh dashboard to update activities list
+      ref.invalidate(dashboardDataProvider);
+    } catch (e) {
+      // Close loading
+      if (context.mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to complete activity: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   /// Mark activity as in progress
-  void _markAsInProgress(BuildContext context) {
-    setState(() {
-      _activity = _activity.copyWith(
-        status: ActivityStatus.inProgress,
-        updatedAt: DateTime.now(),
-      );
-    });
+  Future<void> _markAsInProgress(BuildContext context) async {
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
 
+    try {
+      // Update activity status via API
+      final apiService = ref.read(mcpApiServiceProvider);
+      final updatedActivity = await apiService.updateActivity(
+        activityId: _activity.id,
+        status: ActivityStatus.inProgress,
+      );
+
+      setState(() {
+        _activity = Activity.fromJson(updatedActivity);
+      });
+
+      // Close loading
+      if (context.mounted) Navigator.of(context).pop();
+
+      // Show success message
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Activity started'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+
+      // Refresh dashboard to update activities list
+      ref.invalidate(dashboardDataProvider);
+    } catch (e) {
+      // Close loading
+      if (context.mounted) Navigator.of(context).pop();
+
+      // Show error
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to start activity: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
+  }
+
+  /// View shift notes for this activity
+  void _viewShiftNotes(BuildContext context) {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Activity marked as in progress'),
+        content: Text('Shift notes feature coming soon'),
         duration: Duration(seconds: 2),
       ),
     );
