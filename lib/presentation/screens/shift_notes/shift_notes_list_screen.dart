@@ -9,11 +9,24 @@ import 'create_shift_note_screen.dart';
 
 /// Shift Notes List Screen
 /// Displays all shift notes with ability to create new ones
-class ShiftNotesListScreen extends ConsumerWidget {
+class ShiftNotesListScreen extends ConsumerStatefulWidget {
   const ShiftNotesListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ShiftNotesListScreen> createState() => _ShiftNotesListScreenState();
+}
+
+class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final shiftNotesState = ref.watch(shiftNotesProvider);
 
     return Scaffold(
@@ -63,9 +76,19 @@ class ShiftNotesListScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
+            // Search bar
+            _buildSearchBar(context, ref, state),
+
+            const SizedBox(height: 16),
+
+            // Filter chips
+            _buildFilterChips(context, ref, state),
+
+            const SizedBox(height: 24),
+
             // Recent notes section
             if (state.filteredShiftNotes.isEmpty)
-              _buildEmptyState(context)
+              _buildEmptyState(context, state)
             else
               _buildShiftNotesList(context, ref, state.groupedShiftNotes),
 
@@ -201,8 +224,218 @@ class ShiftNotesListScreen extends ConsumerWidget {
     );
   }
 
+  /// Build search bar
+  Widget _buildSearchBar(
+    BuildContext context,
+    WidgetRef ref,
+    ShiftNotesState state,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: TextField(
+        controller: _searchController,
+        onChanged: (value) {
+          ref.read(shiftNotesProvider.notifier).setSearchQuery(value);
+        },
+        decoration: InputDecoration(
+          hintText: 'Search shift notes...',
+          hintStyle: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
+          prefixIcon: const Icon(
+            Icons.search,
+            color: AppColors.textSecondary,
+          ),
+          suffixIcon: state.searchQuery.isNotEmpty
+              ? IconButton(
+                  icon: const Icon(
+                    Icons.clear,
+                    color: AppColors.textSecondary,
+                  ),
+                  onPressed: () {
+                    _searchController.clear();
+                    ref.read(shiftNotesProvider.notifier).setSearchQuery('');
+                  },
+                )
+              : null,
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Colors.black.withOpacity(0.1),
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: Colors.black.withOpacity(0.1),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Build filter chips
+  Widget _buildFilterChips(
+    BuildContext context,
+    WidgetRef ref,
+    ShiftNotesState state,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Row(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  _buildFilterChip(
+                    context: context,
+                    ref: ref,
+                    label: 'All Notes',
+                    count: state.shiftNotes.length,
+                    isSelected: state.statusFilter == ShiftNoteFilter.all,
+                    onTap: () {
+                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
+                            ShiftNoteFilter.all,
+                          );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    context: context,
+                    ref: ref,
+                    label: 'Drafts',
+                    count: state.draftNotesCount,
+                    isSelected: state.statusFilter == ShiftNoteFilter.draft,
+                    onTap: () {
+                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
+                            ShiftNoteFilter.draft,
+                          );
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterChip(
+                    context: context,
+                    ref: ref,
+                    label: 'Submitted',
+                    count: state.submittedNotesCount,
+                    isSelected: state.statusFilter == ShiftNoteFilter.submitted,
+                    onTap: () {
+                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
+                            ShiftNoteFilter.submitted,
+                          );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+          if (state.statusFilter != ShiftNoteFilter.all ||
+              state.searchQuery.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () {
+                _searchController.clear();
+                ref.read(shiftNotesProvider.notifier).clearFilters();
+              },
+              style: TextButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: const Text(
+                'Clear',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// Build individual filter chip
+  Widget _buildFilterChip({
+    required BuildContext context,
+    required WidgetRef ref,
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected
+                ? AppColors.primary
+                : Colors.black.withOpacity(0.1),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withOpacity(0.2)
+                    : AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// Build empty state
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(BuildContext context, ShiftNotesState state) {
+    // Check if empty due to filters
+    final hasActiveFilters = state.statusFilter != ShiftNoteFilter.all ||
+        state.searchQuery.isNotEmpty;
+
     return Padding(
       padding: const EdgeInsets.all(48),
       child: Center(
@@ -210,23 +443,27 @@ class ShiftNotesListScreen extends ConsumerWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.note_add_outlined,
+              hasActiveFilters ? Icons.filter_list_off : Icons.note_add_outlined,
               size: 64,
               color: AppColors.grey400,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'No shift notes yet',
-              style: TextStyle(
+            Text(
+              hasActiveFilters
+                  ? 'No matching shift notes'
+                  : 'No shift notes yet',
+              style: const TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Create your first shift note to get started',
-              style: TextStyle(
+            Text(
+              hasActiveFilters
+                  ? 'Try adjusting your search or filters'
+                  : 'Create your first shift note to get started',
+              style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
               ),
