@@ -295,6 +295,8 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildSessionActivitiesSection(BuildContext context) {
+    final extractedSection = _extractSection(shiftNote.formattedNote, '🌅 Session Activities');
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -339,8 +341,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              _extractSection(shiftNote.formattedNote, '🌅 Session Activities') ?? 
-              'Supported client with community engagement activities focused on developing independent living skills.',
+              extractedSection ?? shiftNote.rawNotes,
               style: const TextStyle(
                 fontFamily: 'Nunito',
                 fontSize: 14,
@@ -355,6 +356,13 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildBehavioursEngagementSection(BuildContext context) {
+    final extractedSection = _extractSection(shiftNote.formattedNote, '😊 Behaviours & Engagement');
+
+    // If formatted note doesn't have this section, don't show this widget at all
+    if (extractedSection == null && shiftNote.formattedNote == null) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -399,8 +407,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              _extractSection(shiftNote.formattedNote, '😊 Behaviours & Engagement') ?? 
-              'Client was highly engaged throughout the session with positive cooperation.',
+              extractedSection!,
               style: const TextStyle(
                 fontFamily: 'Nunito',
                 fontSize: 14,
@@ -415,6 +422,15 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildGoalProgressSection(BuildContext context) {
+    final extractedSection = _extractSection(shiftNote.formattedNote, '🎯 Goal Progress');
+
+    // If no goals progress AND no formatted section AND no formatted note, don't show this widget
+    if ((shiftNote.goalsProgress == null || shiftNote.goalsProgress!.isEmpty) &&
+        extractedSection == null &&
+        shiftNote.formattedNote == null) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -484,7 +500,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
               ClipRRect(
                 borderRadius: BorderRadius.circular(100),
                 child: LinearProgressIndicator(
-                  value: shiftNote.goalsProgress!.first.progressObserved / 100, 
+                  value: shiftNote.goalsProgress!.first.progressObserved / 100,
                   minHeight: 8,
                   backgroundColor: AppColors.surfaceLight,
                   valueColor: const AlwaysStoppedAnimation<Color>(
@@ -502,7 +518,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
                   height: 1.6,
                 ),
               ),
-            ] else ...[
+            ] else if (extractedSection != null) ...[
               const Text(
                 'Independent Living Skills',
                 style: TextStyle(
@@ -514,8 +530,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                _extractSection(shiftNote.formattedNote, '🎯 Goal Progress') ?? 
-                'Significant progress achieved with session objectives.',
+                extractedSection,
                 style: const TextStyle(
                   fontFamily: 'Nunito',
                   fontSize: 14,
@@ -531,6 +546,13 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
   }
 
   Widget _buildSessionSummarySection(BuildContext context) {
+    final extractedSection = _extractSection(shiftNote.formattedNote, '📋 Session Summary');
+
+    // If formatted note doesn't have this section, don't show this widget at all
+    if (extractedSection == null && shiftNote.formattedNote == null) {
+      return const SizedBox.shrink();
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -575,8 +597,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              _extractSection(shiftNote.formattedNote, '📋 Session Summary') ?? 
-              'Successful session with excellent engagement and measurable progress towards independent living goals.',
+              extractedSection!,
               style: const TextStyle(
                 fontFamily: 'Nunito',
                 fontSize: 14,
