@@ -3,7 +3,7 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 import 'core/config/app_theme.dart';
 import 'core/config/app_constants.dart';
 import 'presentation/screens/auth/sign_in_screen.dart';
-import 'presentation/screens/dashboard/worker_dashboard_screen.dart';
+import 'presentation/screens/dashboard/dashboard_router.dart';
 
 /// Root application widget
 class AgnovatApp extends StatelessWidget {
@@ -23,9 +23,9 @@ class AgnovatApp extends StatelessWidget {
       // No outer Scaffold here - let screens provide their own
       home: ClerkErrorListener(
         child: ClerkAuthBuilder(
-          // When user is signed in - show dashboard
+          // When user is signed in - route to role-based dashboard
           signedInBuilder: (context, authState) {
-            return const WorkerDashboardScreen();
+            return const DashboardRouter();
           },
           // When user is signed out - show custom sign-in screen
           signedOutBuilder: (context, authState) {
