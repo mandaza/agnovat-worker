@@ -1166,10 +1166,10 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 12),
           
-          // Time and Location
-          Row(
-            children: [
-              if ((session['time'] as String).isNotEmpty) ...[
+          // Time
+          if ((session['time'] as String).isNotEmpty)
+            Row(
+              children: [
                 const Icon(
                   Icons.access_time,
                   size: 16,
@@ -1185,8 +1185,12 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-              if ((session['location'] as String).isNotEmpty) ...[
-                const SizedBox(width: 16),
+            ),
+          // Location
+          if ((session['location'] as String).isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
                 const Icon(
                   Icons.location_on,
                   size: 16,
@@ -1205,8 +1209,8 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
                   ),
                 ),
               ],
-            ],
-          ),
+            ),
+          ],
           
           // Session Notes
           if ((session['notes'] as String).isNotEmpty) ...[

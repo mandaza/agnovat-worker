@@ -8,12 +8,11 @@ import '../../../core/providers/service_providers.dart';
 import '../../../data/models/activity.dart';
 import '../../../data/models/activity_session.dart';
 import '../../../data/models/activity_session_enums.dart';
-import '../../../data/models/client.dart';
 import '../../../data/models/goal.dart';
 import '../../../data/models/shift_note.dart';
 import '../../../data/services/media_upload_service.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/dashboard_provider.dart';
+import '../../providers/client_details_provider.dart';
 import '../../providers/shift_notes_provider.dart';
 
 /// Unified Shift Note Creation Wizard
@@ -58,6 +57,10 @@ class _UnifiedShiftNoteWizardState
     super.initState();
     // Pre-fill form if editing, otherwise set default client
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Pre-load clients immediately for seamless selection
+      // This ensures clients are loading in the background even if not yet available
+      ref.read(clientsListCachedProvider.notifier);
+      
       if (widget.shiftNote != null) {
         // Check if trying to edit a submitted note
         if (!widget.shiftNote!.isDraft) {
@@ -77,11 +80,12 @@ class _UnifiedShiftNoteWizardState
         }
         _preFillFormData(widget.shiftNote!);
       } else {
-        final dashboardState = ref.read(dashboardProvider);
-        if (dashboardState.assignedClients.isNotEmpty && _selectedClientId == null) {
+        // Use cached clients provider for instant loading
+        final clientsState = ref.read(clientsListCachedProvider);
+        if (clientsState.clients.isNotEmpty && _selectedClientId == null) {
           setState(() {
-            _selectedClientId = dashboardState.assignedClients.first.id;
-            _selectedClientName = dashboardState.assignedClients.first.name;
+            _selectedClientId = clientsState.clients.first.id;
+            _selectedClientName = clientsState.clients.first.name;
           });
         }
       }
@@ -90,16 +94,23 @@ class _UnifiedShiftNoteWizardState
 
   /// Pre-fill form data when editing an existing shift note
   void _preFillFormData(ShiftNote shiftNote) async {
-    // Get client name
+    // Get client name using cached clients for instant access
     String clientName = 'Unknown Client';
     try {
-      final dashboardState = ref.read(dashboardProvider);
-      final client = dashboardState.assignedClients.firstWhere(
-        (c) => c.id == shiftNote.clientId,
-      );
-      clientName = client.name;
+      final clientsState = ref.read(clientsListCachedProvider);
+      try {
+        final client = clientsState.clients.firstWhere(
+          (c) => c.id == shiftNote.clientId,
+        );
+        clientName = client.name;
+      } catch (e) {
+        // If not in cached list, fetch directly
+        final apiService = ref.read(mcpApiServiceProvider);
+        final client = await apiService.getClient(shiftNote.clientId);
+        clientName = client.name;
+      }
     } catch (e) {
-      // If not in dashboard, fetch client directly
+      // On error, try direct fetch
       try {
         final apiService = ref.read(mcpApiServiceProvider);
         final client = await apiService.getClient(shiftNote.clientId);
@@ -253,8 +264,9 @@ class _UnifiedShiftNoteWizardState
 
   // ==================== STEP 1: SHIFT DETAILS ====================
   Widget _buildStep1ShiftDetails() {
-    final dashboardState = ref.watch(dashboardProvider);
-    final clients = dashboardState.assignedClients;
+    // Watch cached clients provider to trigger loading and ensure data is available
+    // The provider will start loading automatically when first watched
+    ref.watch(clientsListCachedProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,7 +284,7 @@ class _UnifiedShiftNoteWizardState
         _buildSectionLabel('Client'),
         const SizedBox(height: 8),
         InkWell(
-          onTap: widget.shiftNote != null ? null : () => _showClientSelector(clients),
+          onTap: widget.shiftNote != null ? null : () => _showClientSelector(),
           borderRadius: BorderRadius.circular(16),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -734,55 +746,100 @@ class _UnifiedShiftNoteWizardState
     );
   }
 
-  void _showClientSelector(List<Client> clients) {
-    if (clients.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No clients available'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
+  void _showClientSelector() {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Client',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
+      builder: (context) => Consumer(
+        builder: (context, ref, _) {
+          // Watch the clients provider directly inside the modal
+          final clientsState = ref.watch(clientsListCachedProvider);
+          final clients = clientsState.clients;
+          final isLoading = clientsState.isLoading;
+          final error = clientsState.error;
+
+          return Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Select Client',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Show loading state
+                if (isLoading)
+                  const Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: Center(
+                      child: CircularProgressIndicator(),
+                    ),
+                  )
+                // Show error state
+                else if (error != null)
+                  Padding(
+                    padding: const EdgeInsets.all(24.0),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Error loading clients: $error',
+                          style: const TextStyle(
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            ref.read(clientsListCachedProvider.notifier).refresh();
+                          },
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  )
+                // Show empty state
+                else if (clients.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.all(24.0),
+                    child: Center(
+                      child: Text(
+                        'No clients available',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  )
+                // Show clients list
+                else
+                  ...clients.map((client) {
+                    final isSelected = _selectedClientId == client.id;
+                    return ListTile(
+                      title: Text(client.name),
+                      trailing: isSelected
+                          ? const Icon(Icons.check, color: AppColors.primary)
+                          : null,
+                      onTap: () {
+                        setState(() {
+                          _selectedClientId = client.id;
+                          _selectedClientName = client.name;
+                        });
+                        Navigator.pop(context);
+                      },
+                    );
+                  }),
+              ],
             ),
-            const SizedBox(height: 16),
-            ...clients.map((client) {
-              final isSelected = _selectedClientId == client.id;
-              return ListTile(
-                title: Text(client.name),
-                trailing: isSelected
-                    ? const Icon(Icons.check, color: AppColors.primary)
-                    : null,
-                onTap: () {
-                  setState(() {
-                    _selectedClientId = client.id;
-                    _selectedClientName = client.name;
-                  });
-                  Navigator.pop(context);
-                },
-              );
-            }),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1602,8 +1659,9 @@ class _ActivitySessionFormScreenState
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -1611,6 +1669,7 @@ class _ActivitySessionFormScreenState
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
           ),
         ),
       ),
@@ -3070,13 +3129,18 @@ class _BehaviorIncidentFormScreenState
       appBar: AppBar(
         backgroundColor: AppColors.white,
         elevation: 0,
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(Icons.close, color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           widget.existingIncident != null ? 'Edit Behavior' : 'Record Behavior',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
         ),
       ),
       body: SingleChildScrollView(
