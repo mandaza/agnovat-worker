@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../data/models/user.dart';
 import '../../providers/auth_provider.dart';
 import 'worker_dashboard_screen.dart';
-import 'admin_dashboard_screen.dart';
+import 'guardian_dashboard_screen.dart';
 import 'coordinator_dashboard_screen.dart';
 
 /// Dashboard router that routes users to appropriate dashboard based on their role
@@ -77,8 +77,12 @@ class DashboardRouter extends ConsumerWidget {
     switch (user.role) {
       case UserRole.superAdmin:
       case UserRole.manager:
-        // Super admins and managers get admin dashboard
-        return const AdminDashboardScreen();
+        // Super admins and managers get guardian dashboard (web app will be separate)
+        return const GuardianDashboardScreen();
+
+      case UserRole.family:
+        // Family/parents/guardians get guardian dashboard to view their client's data
+        return const GuardianDashboardScreen();
 
       case UserRole.supportCoordinator:
         // Support coordinators get their own dashboard
@@ -92,9 +96,8 @@ class DashboardRouter extends ConsumerWidget {
         // Therapists get worker dashboard for now (can be customized later)
         return const WorkerDashboardScreen();
 
-      case UserRole.family:
       case UserRole.client:
-        // Family and clients get a simplified view (worker dashboard for now)
+        // Clients get worker dashboard for now (can be customized later)
         return const WorkerDashboardScreen();
     }
   }

@@ -177,8 +177,7 @@ class ShiftNotesNotifier extends AutoDisposeNotifier<ShiftNotesState> {
       final query = searchQuery.toLowerCase();
       filtered = filtered.where((note) {
         return note.rawNotes.toLowerCase().contains(query) ||
-            note.shiftDate.contains(query) ||
-            (note.formattedNote?.toLowerCase().contains(query) ?? false);
+            note.shiftDate.contains(query);
       }).toList();
     }
 

@@ -61,12 +61,12 @@ class DashboardRepository {
   }
 
   /// Get pending shift notes count
-  /// Shift notes without formatted_note are considered pending
+  /// Draft shift notes are considered pending
   Future<int> getPendingShiftNotesCount() async {
     try {
       final recentNotes = await _apiService.getRecentShiftNotes(limit: 50);
-      // Count notes without formatted_note field
-      return recentNotes.where((note) => note['formatted_note'] == null).length;
+      // Count draft notes
+      return recentNotes.where((note) => note['status'] == 'draft').length;
     } catch (e) {
       rethrow;
     }

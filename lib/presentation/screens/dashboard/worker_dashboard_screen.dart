@@ -181,6 +181,28 @@ class WorkerDashboardScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
+            // Quick Actions Section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Quick Actions',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildQuickActionsGrid(context),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
             // Today's Activities Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -495,7 +517,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // Quick Stats 2x2 Grid
+  // Quick Stats Grid
   Widget _buildQuickStatsGrid(BuildContext context, DashboardState state) {
     // Get real data from state
     final activitiesCount = _getActivitiesCount(state);
@@ -508,16 +530,6 @@ class WorkerDashboardScreen extends ConsumerWidget {
           children: [
             Expanded(
               child: _buildStatCard(
-                icon: Icons.access_time,
-                value: '${state.shiftsThisWeek}',
-                label: 'Hours This Week',
-                iconBgColor: AppColors.deepBrown.withValues(alpha: 0.1),
-                iconColor: AppColors.deepBrown,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
                 icon: Icons.check_circle_outline,
                 value: '$activitiesCount',
                 label: 'Activities',
@@ -525,11 +537,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
                 iconColor: AppColors.goldenAmber,
               ),
             ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
+            const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
                 icon: Icons.trending_up,
@@ -539,7 +547,11 @@ class WorkerDashboardScreen extends ConsumerWidget {
                 iconColor: AppColors.burntOrange,
               ),
             ),
-            const SizedBox(width: 12),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
             Expanded(
               child: _buildStatCard(
                 icon: Icons.description_outlined,
@@ -549,6 +561,8 @@ class WorkerDashboardScreen extends ConsumerWidget {
                 iconColor: AppColors.textPrimary,
               ),
             ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()),
           ],
         ),
       ],
@@ -576,6 +590,117 @@ class WorkerDashboardScreen extends ConsumerWidget {
     return state.data!.recentShiftNotes
         .where((note) => note['status'] == 'submitted')
         .length;
+  }
+
+  // Quick Actions Grid
+  Widget _buildQuickActionsGrid(BuildContext context) {
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                context: context,
+                icon: Icons.description_outlined,
+                label: 'Shift Notes',
+                color: AppColors.deepBrown,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ShiftNotesListScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildActionCard(
+                context: context,
+                icon: Icons.event_note,
+                label: 'Activities',
+                color: AppColors.goldenAmber,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const ActivitiesListScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildActionCard(
+                context: context,
+                icon: Icons.chat_bubble_outline,
+                label: 'AI Assistant',
+                color: AppColors.tealBlue,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (context) => const AiAssistantScreen(),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: SizedBox()),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(17),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildStatCard({
@@ -749,80 +874,61 @@ class WorkerDashboardScreen extends ConsumerWidget {
   // Bottom Navigation Bar
   Widget _buildBottomNavigation(BuildContext context) {
     return Container(
-      height: 80,
       decoration: BoxDecoration(
-        color: AppColors.white,
-        border: Border(
-          top: BorderSide(
-            color: AppColors.borderLight,
-            width: 1,
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, -2),
           ),
-        ),
+        ],
       ),
-      child: SafeArea(
-        top: false,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildNavItem(
-              icon: Icons.home,
-              label: 'Dashboard',
-              isActive: true,
-              onTap: () {},
-            ),
-            _buildNavItem(
-              icon: Icons.event_note,
-              label: 'Activities',
-              isActive: false,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const ActivitiesListScreen(),
-                  ),
-                );
-              },
-            ),
-            _buildNavItem(
-              icon: Icons.description,
-              label: 'Shift Notes',
-              isActive: false,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const ShiftNotesListScreen(),
-                  ),
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildNavItem({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            icon,
-            color: isActive ? AppColors.deepBrown : AppColors.textSecondary,
-            size: 24,
+      child: BottomNavigationBar(
+        currentIndex: 0,
+        onTap: (index) {
+          // Navigate based on index
+          switch (index) {
+            case 0:
+              // Already on dashboard
+              break;
+            case 1:
+              // Activities
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ActivitiesListScreen(),
+                ),
+              );
+              break;
+            case 2:
+              // Shift Notes
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ShiftNotesListScreen(),
+                ),
+              );
+              break;
+          }
+        },
+        selectedItemColor: AppColors.deepBrown,
+        unselectedItemColor: AppColors.textSecondary,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        selectedFontSize: 11,
+        unselectedFontSize: 10,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Dashboard',
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              color: isActive ? AppColors.deepBrown : AppColors.textSecondary,
-            ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_note),
+            label: 'Activities',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.description),
+            label: 'Shift Notes',
           ),
         ],
       ),

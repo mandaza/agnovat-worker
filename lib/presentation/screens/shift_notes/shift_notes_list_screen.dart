@@ -5,7 +5,9 @@ import '../../../data/models/shift_note.dart';
 import '../../providers/shift_notes_provider.dart';
 import '../../widgets/cards/shift_note_card.dart';
 import 'shift_note_details_screen.dart';
-import 'create_shift_note_screen.dart';
+import 'unified_shift_note_wizard.dart';
+import '../activities/activities_list_screen.dart';
+import '../dashboard/worker_dashboard_screen.dart';
 
 /// Shift Notes List Screen
 /// Displays all shift notes with ability to create new ones
@@ -29,29 +31,88 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
   Widget build(BuildContext context) {
     final shiftNotesState = ref.watch(shiftNotesProvider);
 
-    return Scaffold(
-      backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          'Shift Notes',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
-          ),
-        ),
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const WorkerDashboardScreen(),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.surfaceLight,
+        body: shiftNotesState.isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : shiftNotesState.error != null
+                ? _buildError(context, ref, shiftNotesState.error!)
+                : _buildContent(context, ref, shiftNotesState),
+        bottomNavigationBar: _buildBottomNavigation(context),
       ),
-      body: shiftNotesState.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : shiftNotesState.error != null
-              ? _buildError(context, ref, shiftNotesState.error!)
-              : _buildContent(context, ref, shiftNotesState),
+    );
+  }
+
+  Widget _buildBottomNavigation(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: 2, // Shift Notes tab
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              // Dashboard
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const WorkerDashboardScreen(),
+                ),
+              );
+              break;
+            case 1:
+              // Activities
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ActivitiesListScreen(),
+                ),
+              );
+              break;
+            case 2:
+              // Already on Shift Notes
+              break;
+          }
+        },
+        selectedItemColor: AppColors.deepBrown,
+        unselectedItemColor: AppColors.textSecondary,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        selectedFontSize: 11,
+        unselectedFontSize: 10,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_note),
+            label: 'Activities',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.description),
+            label: 'Shift Notes',
+          ),
+        ],
+      ),
     );
   }
 
@@ -61,54 +122,114 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
     WidgetRef ref,
     ShiftNotesState state,
   ) {
-    return RefreshIndicator(
-      onRefresh: () => ref.read(shiftNotesProvider.notifier).refresh(),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header section with subtitle
-            _buildHeader(context),
+    final filteredNotes = state.filteredShiftNotes;
 
-            // Create New Shift Note button
-            _buildCreateButton(context),
+    return Column(
+      children: [
+        // Header
+        _buildHeader(context),
 
-            const SizedBox(height: 24),
+        // Search and Filters
+        _buildSearchAndFilters(context, ref, state),
 
-            // Search bar
-            _buildSearchBar(context, ref, state),
+        // Content
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: () => ref.read(shiftNotesProvider.notifier).refresh(),
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Create New Shift Note Button
+                  _buildCreateButton(context),
 
-            const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
-            // Filter chips
-            _buildFilterChips(context, ref, state),
+                  // Results count
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${filteredNotes.length} ${filteredNotes.length == 1 ? 'Note' : 'Notes'}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (state.searchQuery.isNotEmpty ||
+                          state.statusFilter != ShiftNoteFilter.all)
+                        TextButton.icon(
+                          onPressed: () {
+                            _searchController.clear();
+                            ref
+                                .read(shiftNotesProvider.notifier)
+                                .clearFilters();
+                          },
+                          icon: const Icon(Icons.clear, size: 16),
+                          label: const Text('Clear Filters'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.deepBrown,
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                    ],
+                  ),
 
-            const SizedBox(height: 24),
+                  const SizedBox(height: 16),
 
-            // Recent notes section
-            if (state.filteredShiftNotes.isEmpty)
-              _buildEmptyState(context, state)
-            else
-              _buildShiftNotesList(context, ref, state.groupedShiftNotes),
+                  // Shift Notes List
+                  if (filteredNotes.isEmpty)
+                    _buildEmptyState(context, state)
+                  else
+                    _buildShiftNotesList(context, ref, state.groupedShiftNotes),
 
-            const SizedBox(height: 24),
-          ],
+                  const SizedBox(height: 100), // Space for bottom nav
+                ],
+              ),
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
-  /// Build header with subtitle
+  /// Build header with title and subtitle
   Widget _buildHeader(BuildContext context) {
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
-      child: const Text(
-        'Manage and review shift documentation',
-        style: TextStyle(
-          fontSize: 14,
-          color: AppColors.textSecondary,
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.borderLight,
+            width: 1,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: const SafeArea(
+        bottom: false,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              'Shift Notes',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Manage and review shift documentation',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -116,264 +237,141 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
 
   /// Build create button
   Widget _buildCreateButton(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: InkWell(
-        onTap: () {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(
-              builder: (context) => const CreateShiftNoteScreen(),
+              builder: (context) => const UnifiedShiftNoteWizard(),
             ),
           );
         },
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [AppColors.deepBrown, AppColors.burntOrange],
-            ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.deepBrown,
+          foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.deepBrown.withValues(alpha: 0.3),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                '+ Create New Shift Note',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Document your recent shift',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.white.withValues(alpha: 0.9),
-                ),
-              ),
-            ],
-          ),
+          elevation: 1,
         ),
-      ),
-    );
-  }
-
-  /// Build shift notes list with groups
-  Widget _buildShiftNotesList(
-    BuildContext context,
-    WidgetRef ref,
-    Map<String, List<ShiftNote>> groupedNotes,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: groupedNotes.entries.map((entry) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Section header
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  entry.key,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-              ),
-
-              // Shift notes in this section
-              ...entry.value.map((note) => Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: ShiftNoteCard(
-                      shiftNote: note,
-                      clientName: 'Tavonga Gore', // TODO: Get actual client name
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                ShiftNoteDetailsScreen(shiftNote: note),
-                          ),
-                        );
-                      },
-                    ),
-                  )),
-
-              const SizedBox(height: 12),
-            ],
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  /// Build search bar
-  Widget _buildSearchBar(
-    BuildContext context,
-    WidgetRef ref,
-    ShiftNotesState state,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: TextField(
-        controller: _searchController,
-        onChanged: (value) {
-          ref.read(shiftNotesProvider.notifier).setSearchQuery(value);
-        },
-        decoration: InputDecoration(
-          hintText: 'Search shift notes...',
-          hintStyle: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 14,
-          ),
-          prefixIcon: const Icon(
-            Icons.search,
-            color: AppColors.textSecondary,
-          ),
-          suffixIcon: state.searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(
-                    Icons.clear,
-                    color: AppColors.textSecondary,
-                  ),
-                  onPressed: () {
-                    _searchController.clear();
-                    ref.read(shiftNotesProvider.notifier).setSearchQuery('');
-                  },
-                )
-              : null,
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: Colors.black.withOpacity(0.1),
-            ),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(
-              color: Colors.black.withOpacity(0.1),
-            ),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(
-              color: AppColors.primary,
-              width: 2,
-            ),
-          ),
-          contentPadding: const EdgeInsets.symmetric(
-            horizontal: 16,
-            vertical: 12,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Build filter chips
-  Widget _buildFilterChips(
-    BuildContext context,
-    WidgetRef ref,
-    ShiftNotesState state,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24),
-      child: Row(
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _buildFilterChip(
-                    context: context,
-                    ref: ref,
-                    label: 'All Notes',
-                    count: state.shiftNotes.length,
-                    isSelected: state.statusFilter == ShiftNoteFilter.all,
-                    onTap: () {
-                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
-                            ShiftNoteFilter.all,
-                          );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    context: context,
-                    ref: ref,
-                    label: 'Drafts',
-                    count: state.draftNotesCount,
-                    isSelected: state.statusFilter == ShiftNoteFilter.draft,
-                    onTap: () {
-                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
-                            ShiftNoteFilter.draft,
-                          );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _buildFilterChip(
-                    context: context,
-                    ref: ref,
-                    label: 'Submitted',
-                    count: state.submittedNotesCount,
-                    isSelected: state.statusFilter == ShiftNoteFilter.submitted,
-                    onTap: () {
-                      ref.read(shiftNotesProvider.notifier).setStatusFilter(
-                            ShiftNoteFilter.submitted,
-                          );
-                    },
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (state.statusFilter != ShiftNoteFilter.all ||
-              state.searchQuery.isNotEmpty) ...[
-            const SizedBox(width: 8),
-            TextButton(
-              onPressed: () {
-                _searchController.clear();
-                ref.read(shiftNotesProvider.notifier).clearFilters();
-              },
-              style: TextButton.styleFrom(
-                foregroundColor: AppColors.primary,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: const Text(
-                'Clear',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
+        child: const Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.add, size: 24),
+            SizedBox(width: 8),
+            Text(
+              'Create New Shift Note',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchAndFilters(
+    BuildContext context,
+    WidgetRef ref,
+    ShiftNotesState state,
+  ) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        children: [
+          // Search Bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search shift notes...',
+              hintStyle: const TextStyle(color: AppColors.textSecondary),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+              suffixIcon: state.searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                      onPressed: () {
+                        _searchController.clear();
+                        ref
+                            .read(shiftNotesProvider.notifier)
+                            .setSearchQuery('');
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppColors.surfaceLight,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+            onChanged: (value) {
+              ref.read(shiftNotesProvider.notifier).setSearchQuery(value);
+            },
+          ),
+
+          const SizedBox(height: 12),
+
+          // Status Filter Chips (All/Drafts/Submitted)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusChip(
+                  context: context,
+                  ref: ref,
+                  label: 'All Notes',
+                  count: state.shiftNotes.length,
+                  isSelected: state.statusFilter == ShiftNoteFilter.all,
+                  onTap: () {
+                    ref
+                        .read(shiftNotesProvider.notifier)
+                        .setStatusFilter(ShiftNoteFilter.all);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  context: context,
+                  ref: ref,
+                  label: 'Drafts',
+                  count: state.draftNotesCount,
+                  isSelected: state.statusFilter == ShiftNoteFilter.draft,
+                  onTap: () {
+                    ref
+                        .read(shiftNotesProvider.notifier)
+                        .setStatusFilter(ShiftNoteFilter.draft);
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  context: context,
+                  ref: ref,
+                  label: 'Submitted',
+                  count: state.submittedNotesCount,
+                  isSelected: state.statusFilter == ShiftNoteFilter.submitted,
+                  onTap: () {
+                    ref
+                        .read(shiftNotesProvider.notifier)
+                        .setStatusFilter(ShiftNoteFilter.submitted);
+                  },
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// Build individual filter chip
-  Widget _buildFilterChip({
+  Widget _buildStatusChip({
     required BuildContext context,
     required WidgetRef ref,
     required String label,
@@ -387,12 +385,10 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
+          color: isSelected ? AppColors.deepBrown : Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected
-                ? AppColors.primary
-                : Colors.black.withOpacity(0.1),
+            color: isSelected ? AppColors.deepBrown : AppColors.borderLight,
           ),
         ),
         child: Row(
@@ -411,7 +407,7 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? Colors.white.withOpacity(0.2)
+                    ? Colors.white.withValues(alpha: 0.2)
                     : AppColors.surfaceLight,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -430,37 +426,88 @@ class _ShiftNotesListScreenState extends ConsumerState<ShiftNotesListScreen> {
     );
   }
 
+  /// Build shift notes list with groups
+  Widget _buildShiftNotesList(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, List<ShiftNote>> groupedNotes,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedNotes.entries.map((entry) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section header
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                entry.key,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+
+            // Shift notes in this section
+            ...entry.value.map((note) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ShiftNoteCard(
+                    shiftNote: note,
+                    clientName: 'Tavonga Gore', // TODO: Get actual client name
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ShiftNoteDetailsScreen(shiftNoteId: note.id),
+                        ),
+                      );
+                    },
+                  ),
+                )),
+
+            const SizedBox(height: 12),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
   /// Build empty state
   Widget _buildEmptyState(BuildContext context, ShiftNotesState state) {
-    // Check if empty due to filters
-    final hasActiveFilters = state.statusFilter != ShiftNoteFilter.all ||
-        state.searchQuery.isNotEmpty;
+    final hasFilters = state.searchQuery.isNotEmpty ||
+        state.statusFilter != ShiftNoteFilter.all;
 
-    return Padding(
-      padding: const EdgeInsets.all(48),
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
       child: Center(
         child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              hasActiveFilters ? Icons.filter_list_off : Icons.note_add_outlined,
+              hasFilters ? Icons.search_off : Icons.description_outlined,
               size: 64,
-              color: AppColors.grey400,
+              color: AppColors.textSecondary,
             ),
             const SizedBox(height: 16),
             Text(
-              hasActiveFilters
-                  ? 'No matching shift notes'
-                  : 'No shift notes yet',
+              hasFilters ? 'No notes found' : 'No shift notes yet',
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              hasActiveFilters
+              hasFilters
                   ? 'Try adjusting your search or filters'
                   : 'Create your first shift note to get started',
               style: const TextStyle(

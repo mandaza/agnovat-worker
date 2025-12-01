@@ -4,6 +4,7 @@ import '../models/client.dart';
 import '../models/activity.dart';
 import '../models/goal.dart';
 import '../models/user.dart';
+import '../models/shift_note.dart';
 
 /// MCP API Service (Convex Backend)
 /// Handles all communication with Convex functions
@@ -24,6 +25,41 @@ class McpApiService {
     );
 
     return User.fromJson(result);
+  }
+
+  /// Get user by ID
+  /// Calls Convex function: users:get
+  Future<User> getUserById(String userId) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.usersGet,
+      args: {'id': userId},
+    );
+
+    return User.fromJson(result);
+  }
+
+  /// List all users
+  /// Calls Convex function: users:list
+  Future<List<User>> listUsers({
+    String? role,
+    bool? active,
+    int? limit,
+    int? offset,
+  }) async {
+    final args = <String, dynamic>{};
+    if (role != null) args['role'] = role;
+    if (active != null) args['active'] = active;
+    if (limit != null) args['limit'] = limit;
+    if (offset != null) args['offset'] = offset;
+
+    final result = await _convexClient.query<List<dynamic>>(
+      ApiConfig.usersList,
+      args: args,
+    );
+
+    return result
+        .map((json) => User.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 
   /// Get user profile with stakeholder details
@@ -314,6 +350,17 @@ class McpApiService {
 
   // ==================== SHIFT NOTES ====================
 
+  /// Get shift note by ID
+  /// Calls Convex function: shiftNotes:get
+  Future<ShiftNote> getShiftNote(String shiftNoteId) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.shiftNotesGet,
+      args: {'id': shiftNoteId},
+    );
+
+    return ShiftNote.fromJson(result);
+  }
+
   /// Get recent shift notes
   /// Calls Convex function: shiftNotes:getRecent
   Future<List<Map<String, dynamic>>> getRecentShiftNotes({
@@ -368,7 +415,6 @@ class McpApiService {
     required String endTime, // HH:MM
     List<String>? primaryLocations,
     required String rawNotes,
-    String? formattedNote,
     List<String>? activityIds,
     List<Map<String, dynamic>>? goalsProgress,
   }) async {
@@ -385,9 +431,6 @@ class McpApiService {
       if (primaryLocations != null && primaryLocations.isNotEmpty) {
         args['primary_locations'] = primaryLocations;
       }
-      if (formattedNote != null && formattedNote.isNotEmpty) {
-        args['formatted_note'] = formattedNote;
-      }
       if (activityIds != null && activityIds.isNotEmpty) {
         args['activity_ids'] = activityIds;
       }
@@ -395,16 +438,10 @@ class McpApiService {
         args['goals_progress'] = goalsProgress;
       }
 
-      print('🔄 Calling Convex mutation: ${ApiConfig.shiftNotesCreate}');
-      print('📦 Args: $args');
-
       final result = await _convexClient.mutation<dynamic>(
         ApiConfig.shiftNotesCreate,
         args: args,
       );
-
-      print('📥 Raw result: $result');
-      print('📥 Result type: ${result.runtimeType}');
 
       // Handle null response
       if (result == null) {
@@ -433,7 +470,6 @@ class McpApiService {
     String? endTime,
     List<String>? primaryLocations,
     String? rawNotes,
-    String? formattedNote,
     List<String>? activityIds,
     List<Map<String, dynamic>>? goalsProgress,
   }) async {
@@ -447,7 +483,6 @@ class McpApiService {
     if (endTime != null) args['end_time'] = endTime;
     if (primaryLocations != null) args['primary_locations'] = primaryLocations;
     if (rawNotes != null) args['raw_notes'] = rawNotes;
-    if (formattedNote != null) args['formatted_note'] = formattedNote;
     if (activityIds != null) args['activity_ids'] = activityIds;
     if (goalsProgress != null) args['goals_progress'] = goalsProgress;
 
@@ -479,47 +514,100 @@ class McpApiService {
     return result;
   }
 
-  /// Get formatting prompt from Convex
-  /// Returns the prompt to send to Claude API
-  Future<Map<String, dynamic>> getFormattingPrompt({
-    String? shiftNoteId,
-    String? rawNotes,
-    String? clientId,
-    String? userId,
+  /// Add activity session to shift note
+  /// Links an activity session to a shift note
+  /// Calls Convex function: shiftNotes:addActivitySession
+  Future<Map<String, dynamic>> addActivitySessionToShiftNote({
+    required String shiftNoteId,
+    required String activitySessionId,
   }) async {
-    final args = <String, dynamic>{};
-
-    if (shiftNoteId != null) {
-      args['id'] = shiftNoteId;
-    } else if (rawNotes != null) {
-      args['raw_notes'] = rawNotes;
-      if (clientId != null) args['client_id'] = clientId;
-      if (userId != null) args['user_id'] = userId;
-    } else {
-      throw ArgumentError('Either shiftNoteId or rawNotes is required');
-    }
-
-    // This is a QUERY, not a mutation
-    final result = await _convexClient.query<Map<String, dynamic>>(
-      ApiConfig.shiftNotesFormat,
-      args: args,
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.shiftNotesAddActivitySession,
+      args: {
+        'shift_note_id': shiftNoteId,
+        'activity_session_id': activitySessionId,
+      },
     );
 
-    // Returns: { formatting_prompt, shift_note_id, client_name, user_name }
     return result;
   }
 
-  /// Save formatted shift note back to Convex
-  /// Calls Convex function: shiftNotes:saveFormatted
-  Future<Map<String, dynamic>> saveFormattedShiftNote({
-    required String shiftNoteId,
-    required String formattedNote,
+  /// Get shift note with all activity sessions
+  /// Returns complete shift note with embedded sessions and behaviors
+  /// Calls Convex function: shiftNotes:getWithSessions
+  Future<Map<String, dynamic>> getShiftNoteWithSessions(String shiftNoteId) async {
+    final result = await _convexClient.query<Map<String, dynamic>>(
+      ApiConfig.shiftNotesGetWithSessions,
+      args: {'id': shiftNoteId},
+    );
+
+    return result;
+  }
+
+  // ==================== MEDIA UPLOAD METHODS ====================
+
+  /// Generate upload URL for media files
+  /// Returns a URL that can be used to upload files to Convex storage
+  /// Calls Convex function: activitySessions:generateUploadUrl
+  Future<String> generateMediaUploadUrl() async {
+    final result = await _convexClient.mutation<String>(
+      ApiConfig.activitySessionsGenerateUploadUrl,
+      args: {},
+    );
+
+    return result;
+  }
+
+  /// Add media to an activity session
+  /// Links uploaded media (photo/video) to an activity session
+  /// Calls Convex function: activitySessions:addMedia
+  Future<Map<String, dynamic>> addMediaToSession({
+    required String sessionId,
+    required String storageId,
+    required String type, // 'photo' or 'video'
+    required String fileName,
+    required int fileSize,
+    required String mimeType,
   }) async {
     final result = await _convexClient.mutation<Map<String, dynamic>>(
-      ApiConfig.shiftNotesSaveFormatted,
+      ApiConfig.activitySessionsAddMedia,
       args: {
-        'id': shiftNoteId,
-        'formatted_note': formattedNote,
+        'session_id': sessionId,
+        'storage_id': storageId,
+        'type': type,
+        'file_name': fileName,
+        'file_size': fileSize,
+        'mime_type': mimeType,
+      },
+    );
+
+    return result;
+  }
+
+  /// Get file URL for displaying media
+  /// Returns a URL that can be used to display/download the media file
+  /// Calls Convex function: activitySessions:getFileUrl
+  Future<String> getMediaFileUrl(String storageId) async {
+    final result = await _convexClient.query<String>(
+      ApiConfig.activitySessionsGetFileUrl,
+      args: {'storage_id': storageId},
+    );
+
+    return result;
+  }
+
+  /// Remove media from an activity session
+  /// Deletes the media file and removes it from the session
+  /// Calls Convex function: activitySessions:removeMedia
+  Future<Map<String, dynamic>> removeMediaFromSession({
+    required String sessionId,
+    required String mediaId,
+  }) async {
+    final result = await _convexClient.mutation<Map<String, dynamic>>(
+      ApiConfig.activitySessionsRemoveMedia,
+      args: {
+        'session_id': sessionId,
+        'media_id': mediaId,
       },
     );
 

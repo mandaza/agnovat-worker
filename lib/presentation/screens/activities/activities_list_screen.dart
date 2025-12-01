@@ -5,6 +5,8 @@ import '../../../data/models/activity.dart';
 import '../../providers/activities_provider.dart';
 import '../../widgets/cards/activity_card.dart';
 import 'activity_details_screen.dart';
+import '../shift_notes/shift_notes_list_screen.dart';
+import '../dashboard/worker_dashboard_screen.dart';
 
 /// Activities List Screen
 /// Displays all activities with search and filter capabilities
@@ -29,15 +31,23 @@ class _ActivitiesListScreenState extends ConsumerState<ActivitiesListScreen> {
   Widget build(BuildContext context) {
     final activitiesState = ref.watch(activitiesProvider);
 
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (didPop) {
+        if (!didPop) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => const WorkerDashboardScreen(),
+            ),
+          );
+        }
+      },
+      child: Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
+        automaticallyImplyLeading: false,
         title: const Text(
           'Activities',
           style: TextStyle(
@@ -62,6 +72,70 @@ class _ActivitiesListScreenState extends ConsumerState<ActivitiesListScreen> {
                         context,
                         activitiesState.groupedActivities,
                       ),
+          ),
+        ],
+      ),
+      bottomNavigationBar: _buildBottomNavigation(context),
+      ),
+    );
+  }
+
+  Widget _buildBottomNavigation(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: BottomNavigationBar(
+        currentIndex: 1, // Activities tab
+        onTap: (index) {
+          switch (index) {
+            case 0:
+              // Dashboard
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const WorkerDashboardScreen(),
+                ),
+              );
+              break;
+            case 1:
+              // Already on Activities
+              break;
+            case 2:
+              // Shift Notes
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => const ShiftNotesListScreen(),
+                ),
+              );
+              break;
+          }
+        },
+        selectedItemColor: AppColors.deepBrown,
+        unselectedItemColor: AppColors.textSecondary,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        selectedFontSize: 11,
+        unselectedFontSize: 10,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Dashboard',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.event_note),
+            label: 'Activities',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.description),
+            label: 'Shift Notes',
           ),
         ],
       ),

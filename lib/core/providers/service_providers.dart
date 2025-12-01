@@ -1,8 +1,10 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/convex_client_service.dart';
-import '../services/claude_api_service.dart';
 import '../services/secure_storage_service.dart';
 import '../../data/services/mcp_api_service.dart';
+import '../../data/services/activity_session_service.dart';
+import '../../data/services/sync_service.dart';
+import '../../data/database/drift_database.dart';
 import '../../data/repositories/dashboard_repository.dart';
 
 /// Convex Client Service Provider
@@ -16,24 +18,6 @@ final convexClientProvider = Provider<ConvexClientService>((ref) {
 final mcpApiServiceProvider = Provider<McpApiService>((ref) {
   final convexClient = ref.watch(convexClientProvider);
   return McpApiService(convexClient);
-});
-
-/// Claude API Service Provider
-/// Provides access to Claude AI for shift note formatting
-///
-/// To use:
-/// 1. Get your API key from https://console.anthropic.com
-/// 2. Set the CLAUDE_API_KEY environment variable
-/// 3. Or update the apiKey parameter below (not recommended for production)
-final claudeApiServiceProvider = Provider<ClaudeApiService>((ref) {
-  // TODO: Load from environment variable or secure storage
-  // For now, using a placeholder - replace with your actual API key
-  const apiKey = String.fromEnvironment(
-    'CLAUDE_API_KEY',
-    defaultValue: 'YOUR_CLAUDE_API_KEY',
-  );
-
-  return ClaudeApiService(apiKey: apiKey);
 });
 
 /// Secure Storage Service Provider
@@ -50,4 +34,25 @@ final secureStorageServiceProvider = Provider<SecureStorageService>((ref) {
 final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
   final apiService = ref.watch(mcpApiServiceProvider);
   return DashboardRepository(apiService);
+});
+
+/// App Database Provider (Drift)
+/// Provides access to local SQLite database for offline storage
+final appDatabaseProvider = Provider<AppDatabase>((ref) {
+  return AppDatabase();
+});
+
+/// Activity Session Service Provider
+/// Provides access to Activity Sessions Convex backend functions
+final activitySessionServiceProvider = Provider<ActivitySessionService>((ref) {
+  final convexClient = ref.watch(convexClientProvider);
+  return ActivitySessionService(convexClient);
+});
+
+/// Sync Service Provider
+/// Provides offline-first sync functionality for Activity Sessions
+final syncServiceProvider = Provider<SyncService>((ref) {
+  final database = ref.watch(appDatabaseProvider);
+  final sessionService = ref.watch(activitySessionServiceProvider);
+  return SyncService(database, sessionService);
 });

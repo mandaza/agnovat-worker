@@ -59,7 +59,6 @@ class ShiftNote extends Equatable {
   final DateTime? submittedAt; // When the note was submitted
   final List<String>? primaryLocations;
   final String rawNotes;
-  final String? formattedNote;
   final List<String>? activityIds;
   final List<GoalProgress>? goalsProgress;
   final DateTime createdAt;
@@ -76,7 +75,6 @@ class ShiftNote extends Equatable {
     this.submittedAt,
     this.primaryLocations,
     required this.rawNotes,
-    this.formattedNote,
     this.activityIds,
     this.goalsProgress,
     required this.createdAt,
@@ -136,7 +134,6 @@ class ShiftNote extends Equatable {
     DateTime? submittedAt,
     List<String>? primaryLocations,
     String? rawNotes,
-    String? formattedNote,
     List<String>? activityIds,
     List<GoalProgress>? goalsProgress,
     DateTime? createdAt,
@@ -153,7 +150,6 @@ class ShiftNote extends Equatable {
       submittedAt: submittedAt ?? this.submittedAt,
       primaryLocations: primaryLocations ?? this.primaryLocations,
       rawNotes: rawNotes ?? this.rawNotes,
-      formattedNote: formattedNote ?? this.formattedNote,
       activityIds: activityIds ?? this.activityIds,
       goalsProgress: goalsProgress ?? this.goalsProgress,
       createdAt: createdAt ?? this.createdAt,
@@ -174,7 +170,6 @@ class ShiftNote extends Equatable {
       'submitted_at': submittedAt?.toIso8601String(),
       'primary_locations': primaryLocations,
       'raw_notes': rawNotes,
-      'formatted_note': formattedNote,
       'activity_ids': activityIds,
       'goals_progress': goalsProgress?.map((g) => g.toJson()).toList(),
       'created_at': createdAt.toIso8601String(),
@@ -184,13 +179,20 @@ class ShiftNote extends Equatable {
 
   /// Create from JSON
   factory ShiftNote.fromJson(Map<String, dynamic> json) {
+    // Helper to safely get string value with fallback
+    String getString(String key, [String fallback = '']) {
+      final value = json[key];
+      if (value == null) return fallback;
+      return value.toString();
+    }
+
     return ShiftNote(
-      id: json['id'] as String,
-      clientId: json['client_id'] as String,
-      userId: json['user_id'] as String,
-      shiftDate: json['shift_date'] as String,
-      startTime: json['start_time'] as String,
-      endTime: json['end_time'] as String,
+      id: getString('_id', getString('id')),
+      clientId: getString('client_id'),
+      userId: getString('user_id'),
+      shiftDate: getString('shift_date'),
+      startTime: getString('start_time', '00:00'),
+      endTime: getString('end_time', '00:00'),
       status: json['status'] != null
           ? ShiftNoteStatus.fromJson(json['status'] as String)
           : ShiftNoteStatus.draft,
@@ -198,14 +200,17 @@ class ShiftNote extends Equatable {
           ? DateTime.parse(json['submitted_at'] as String)
           : null,
       primaryLocations: (json['primary_locations'] as List?)?.cast<String>(),
-      rawNotes: json['raw_notes'] as String,
-      formattedNote: json['formatted_note'] as String?,
+      rawNotes: getString('raw_notes'),
       activityIds: (json['activity_ids'] as List?)?.cast<String>(),
       goalsProgress: (json['goals_progress'] as List?)
           ?.map((g) => GoalProgress.fromJson(g as Map<String, dynamic>))
           .toList(),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : DateTime.now(),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : DateTime.now(),
     );
   }
 
@@ -221,7 +226,6 @@ class ShiftNote extends Equatable {
         submittedAt,
         primaryLocations,
         rawNotes,
-        formattedNote,
         activityIds,
         goalsProgress,
         createdAt,

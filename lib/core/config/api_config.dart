@@ -63,10 +63,10 @@ class ApiConfig {
   static const String shiftNotesUpdate = 'shiftNotes:update';
   static const String shiftNotesDelete = 'shiftNotes:remove';
   static const String shiftNotesSubmit = 'shiftNotes:submit';
-  static const String shiftNotesFormat = 'shiftNotes:format';
-  static const String shiftNotesSaveFormatted = 'shiftNotes:saveFormatted';
   static const String shiftNotesGetRecent = 'shiftNotes:getRecent';
   static const String shiftNotesGetForWeek = 'shiftNotes:getForWeek';
+  static const String shiftNotesAddActivitySession = 'shiftNotes:addActivitySession'; // NEW
+  static const String shiftNotesGetWithSessions = 'shiftNotes:getWithSessions'; // NEW
 
   // Dashboard
   static const String dashboardGet = 'dashboard:getDashboard';
@@ -81,4 +81,31 @@ class ApiConfig {
   static const String authUpdateLastLogin = 'auth:updateLastLogin';
   static const String authEmailExists = 'auth:emailExists';
   static const String authLinkStakeholder = 'auth:linkStakeholder';
+  
+  // Users
+  static const String usersGet = 'users:get';
+  static const String usersList = 'users:list';
+
+  // Behavior Incidents
+  static const String behaviorIncidentsCreate = 'behaviorIncidents:create';
+  static const String behaviorIncidentsGet = 'behaviorIncidents:getById';
+  static const String behaviorIncidentsList = 'behaviorIncidents:list';
+  static const String behaviorIncidentsUpdate = 'behaviorIncidents:update';
+  static const String behaviorIncidentsRemove = 'behaviorIncidents:remove';
+  static const String behaviorIncidentsGetStats = 'behaviorIncidents:getStats';
+  static const String behaviorIncidentsGetRecentHighSeverity = 'behaviorIncidents:getRecentHighSeverity';
+
+  // Activity Sessions
+  static const String activitySessionsCreate = 'activitySessions:create';
+  static const String activitySessionsGet = 'activitySessions:getById';
+  static const String activitySessionsList = 'activitySessions:list';
+  static const String activitySessionsUpdate = 'activitySessions:update';
+  static const String activitySessionsDelete = 'activitySessions:delete';
+  static const String activitySessionsGetActivityEffectivenessReport = 'activitySessions:getActivityEffectivenessReport';
+
+  // Activity Sessions - Media Upload
+  static const String activitySessionsGenerateUploadUrl = 'activitySessions:generateUploadUrl';
+  static const String activitySessionsAddMedia = 'activitySessions:addMedia';
+  static const String activitySessionsGetFileUrl = 'activitySessions:getFileUrl';
+  static const String activitySessionsRemoveMedia = 'activitySessions:removeMedia';
 }

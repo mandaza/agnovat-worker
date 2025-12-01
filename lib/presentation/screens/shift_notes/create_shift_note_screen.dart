@@ -4,13 +4,13 @@ import 'package:intl/intl.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/providers/service_providers.dart';
 import '../../../data/models/activity.dart';
+import '../../../data/models/activity_session.dart';
 import '../../../data/models/client.dart';
 import '../../../data/models/goal.dart';
 import '../../../data/models/shift_note.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/shift_notes_provider.dart';
-import 'ai_formatting_screen.dart';
 
 /// Create Shift Note Screen
 /// Form to document a new shift with all required details
@@ -46,6 +46,7 @@ class _CreateShiftNoteScreenState
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   List<String> _selectedActivityIds = []; // Selected activity IDs
+  List<String> _selectedActivitySessionIds = []; // Selected activity session IDs
   List<String> _selectedGoalIds = []; // Selected goal IDs
   List<String> _locations = []; // Multiple locations
 
@@ -76,19 +77,26 @@ class _CreateShiftNoteScreenState
   /// Pre-fill form data when editing an existing shift note
   void _preFillFormData(ShiftNote shiftNote) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Get client name from dashboard
-      final dashboardState = ref.read(dashboardProvider);
+      // Get client name - try dashboard first
       String clientName = 'Unknown Client';
       
       try {
+        final dashboardState = ref.read(dashboardProvider);
         final client = dashboardState.assignedClients.firstWhere(
           (c) => c.id == shiftNote.clientId,
         );
         clientName = client.name;
       } catch (e) {
-        if (dashboardState.assignedClients.isNotEmpty) {
-          clientName = dashboardState.assignedClients.first.name;
-        }
+        // If not in dashboard, fetch client directly (async)
+        ref.read(mcpApiServiceProvider).getClient(shiftNote.clientId).then((client) {
+          if (mounted) {
+            setState(() {
+              _selectedClientName = client.name;
+            });
+          }
+        }).catchError((e) {
+          // Keep default 'Unknown Client'
+        });
       }
       
       setState(() {
@@ -227,6 +235,10 @@ class _CreateShiftNoteScreenState
                       _buildActivitiesField(),
                       const SizedBox(height: 24),
 
+                      // Activity Sessions
+                      _buildActivitySessionsSelector(),
+                      const SizedBox(height: 24),
+
                       // Behaviours & Engagement
                       _buildBehavioursField(),
                       const SizedBox(height: 24),
@@ -238,10 +250,6 @@ class _CreateShiftNoteScreenState
                       // Progress Notes
                       _buildProgressNotesField(),
                       const SizedBox(height: 32),
-
-                      // Format with AI button
-                      _buildFormatWithAIButton(),
-                      const SizedBox(height: 24),
 
                       // Save buttons
                       _buildSaveShiftNoteButton(),
@@ -291,28 +299,23 @@ class _CreateShiftNoteScreenState
 
   /// Build client selector
   Widget _buildClientSelector() {
+    final isEditing = widget.shiftNote != null;
     final dashboardState = ref.watch(dashboardProvider);
     final clients = dashboardState.assignedClients;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Client',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        _buildSectionLabel('Client'),
         const SizedBox(height: 8),
         InkWell(
-          onTap: () => _showClientSelector(clients),
+          onTap: isEditing ? null : () => _showClientSelector(clients),
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.grey100,
+              color: AppColors.white,
+              border: Border.all(color: AppColors.borderLight),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -321,13 +324,18 @@ class _CreateShiftNoteScreenState
                 Text(
                   _selectedClientName ?? 'Select client',
                   style: TextStyle(
-                    fontSize: 14,
-                    color: _selectedClientName != null 
-                        ? AppColors.textPrimary 
-                        : AppColors.textSecondary,
+                    fontSize: 16,
+                    color: isEditing
+                        ? AppColors.textSecondary
+                        : (_selectedClientName != null 
+                            ? AppColors.textPrimary 
+                            : AppColors.textSecondary),
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down, size: 16),
+                if (isEditing)
+                  const Icon(Icons.lock_outline, size: 20, color: AppColors.textSecondary)
+                else
+                  const Icon(Icons.keyboard_arrow_down, size: 20),
               ],
             ),
           ),
@@ -390,6 +398,18 @@ class _CreateShiftNoteScreenState
     );
   }
 
+  /// Build section label (matching wizard style)
+  Widget _buildSectionLabel(String label) {
+    return Text(
+      label,
+      style: const TextStyle(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      ),
+    );
+  }
+
   /// Build date picker
   Widget _buildDatePicker() {
     final isEditing = widget.shiftNote != null;
@@ -397,14 +417,7 @@ class _CreateShiftNoteScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Date',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        _buildSectionLabel('Shift Date'),
         const SizedBox(height: 8),
         InkWell(
           onTap: isEditing ? null : () async {
@@ -420,25 +433,32 @@ class _CreateShiftNoteScreenState
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.grey100,
+              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.white,
+              border: Border.all(
+                color: isEditing ? AppColors.borderLight.withOpacity(0.5) : AppColors.borderLight,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
+                if (!isEditing) ...[
+                  const Icon(Icons.calendar_today, size: 20, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                ],
                 Text(
-                  DateFormat('MMM d, yyyy').format(_selectedDate),
+                  DateFormat('EEEE, MMMM d, yyyy').format(_selectedDate),
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     color: isEditing ? AppColors.textSecondary : AppColors.textPrimary,
                   ),
                 ),
                 if (isEditing) ...[
-                  const SizedBox(width: 8),
-                  Icon(
+                  const Spacer(),
+                  const Icon(
                     Icons.lock_outline,
-                    size: 14,
+                    size: 16,
                     color: AppColors.textSecondary,
                   ),
                 ],
@@ -452,27 +472,25 @@ class _CreateShiftNoteScreenState
 
   /// Build shift type selector
   Widget _buildShiftTypeSelector() {
+    final isEditing = widget.shiftNote != null;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Shift Type',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        _buildSectionLabel('Shift Type'),
         const SizedBox(height: 8),
         InkWell(
-          onTap: () {
+          onTap: isEditing ? null : () {
             _showShiftTypeSelector();
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: AppColors.grey100,
+              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.white,
+              border: Border.all(
+                color: isEditing ? AppColors.borderLight.withOpacity(0.5) : AppColors.borderLight,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -480,12 +498,15 @@ class _CreateShiftNoteScreenState
               children: [
                 Text(
                   _selectedShiftType,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: isEditing ? AppColors.textSecondary : AppColors.textPrimary,
                   ),
                 ),
-                const Icon(Icons.keyboard_arrow_down, size: 16),
+                if (isEditing)
+                  const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary)
+                else
+                  const Icon(Icons.keyboard_arrow_down, size: 20),
               ],
             ),
           ),
@@ -501,14 +522,7 @@ class _CreateShiftNoteScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'Start Time',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        _buildSectionLabel('Start Time'),
         const SizedBox(height: 8),
         InkWell(
           onTap: isEditing ? null : () async {
@@ -522,32 +536,39 @@ class _CreateShiftNoteScreenState
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.grey100,
+              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.white,
+              border: Border.all(
+                color: isEditing ? AppColors.borderLight.withOpacity(0.5) : AppColors.borderLight,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
-                Text(
-                  _startTime != null
-                      ? _startTime!.format(context)
-                      : 'Select time',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isEditing 
-                        ? AppColors.textSecondary 
-                        : (_startTime != null ? AppColors.textPrimary : AppColors.textSecondary),
+                if (!isEditing) ...[
+                  const Icon(Icons.access_time, size: 20, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    _startTime != null
+                        ? _startTime!.format(context)
+                        : 'Select time',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isEditing 
+                          ? AppColors.textSecondary 
+                          : (_startTime != null ? AppColors.textPrimary : AppColors.textSecondary),
+                    ),
                   ),
                 ),
-                if (isEditing) ...[
-                  const SizedBox(width: 8),
-                  Icon(
+                if (isEditing)
+                  const Icon(
                     Icons.lock_outline,
-                    size: 14,
+                    size: 16,
                     color: AppColors.textSecondary,
                   ),
-                ],
               ],
             ),
           ),
@@ -563,14 +584,7 @@ class _CreateShiftNoteScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
-          'End Time',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textPrimary,
-          ),
-        ),
+        _buildSectionLabel('End Time'),
         const SizedBox(height: 8),
         InkWell(
           onTap: isEditing ? null : () async {
@@ -584,30 +598,37 @@ class _CreateShiftNoteScreenState
           },
           borderRadius: BorderRadius.circular(16),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             decoration: BoxDecoration(
-              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.grey100,
+              color: isEditing ? AppColors.grey100.withOpacity(0.5) : AppColors.white,
+              border: Border.all(
+                color: isEditing ? AppColors.borderLight.withOpacity(0.5) : AppColors.borderLight,
+              ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
               children: [
-                Text(
-                  _endTime != null ? _endTime!.format(context) : 'Select time',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isEditing 
-                        ? AppColors.textSecondary 
-                        : (_endTime != null ? AppColors.textPrimary : AppColors.textSecondary),
+                if (!isEditing) ...[
+                  const Icon(Icons.access_time, size: 20, color: AppColors.primary),
+                  const SizedBox(width: 12),
+                ],
+                Expanded(
+                  child: Text(
+                    _endTime != null ? _endTime!.format(context) : 'Select time',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: isEditing 
+                          ? AppColors.textSecondary 
+                          : (_endTime != null ? AppColors.textPrimary : AppColors.textSecondary),
+                    ),
                   ),
                 ),
-                if (isEditing) ...[
-                  const SizedBox(width: 8),
-                  Icon(
+                if (isEditing)
+                  const Icon(
                     Icons.lock_outline,
-                    size: 14,
+                    size: 16,
                     color: AppColors.textSecondary,
                   ),
-                ],
               ],
             ),
           ),
@@ -646,9 +667,10 @@ class _CreateShiftNoteScreenState
         const SizedBox(height: 8),
         if (_locations.isEmpty)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: AppColors.grey100,
+              color: AppColors.white,
+              border: Border.all(color: AppColors.borderLight),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
@@ -670,7 +692,8 @@ class _CreateShiftNoteScreenState
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppColors.grey100,
+                  color: AppColors.white,
+                  border: Border.all(color: AppColors.borderLight),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -813,12 +836,20 @@ class _CreateShiftNoteScreenState
             hintText: 'Add additional activity notes...',
             hintStyle: const TextStyle(color: AppColors.textSecondary),
             filled: true,
-            fillColor: AppColors.grey100,
+            fillColor: AppColors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderSide: const BorderSide(color: AppColors.borderLight),
             ),
-            contentPadding: const EdgeInsets.all(12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.borderLight),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
       ],
@@ -950,6 +981,216 @@ class _CreateShiftNoteScreenState
     );
   }
 
+  /// Build activity sessions selector
+  Widget _buildActivitySessionsSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Activity Sessions',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _selectedClientId != null ? _selectActivitySessions : null,
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Select Sessions'),
+              style: TextButton.styleFrom(
+                foregroundColor: _selectedClientId != null ? AppColors.primary : AppColors.textSecondary,
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        if (_selectedActivitySessionIds.isEmpty)
+          Container(
+            padding: const EdgeInsets.all(32),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              border: Border.all(color: AppColors.borderLight),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: const Center(
+              child: Text(
+                'No activity sessions selected',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+          )
+        else
+          FutureBuilder<List<ActivitySession>>(
+            future: _fetchClientActivitySessions(),
+            builder: (context, snapshot) {
+              if (snapshot.hasData) {
+                return Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _selectedActivitySessionIds.map((sessionId) {
+                    try {
+                      final session = snapshot.data!.firstWhere((s) => s.id == sessionId);
+                      return Chip(
+                        label: Text(
+                          '${session.activityTitle ?? 'Session'} - ${DateFormat('MMM d, h:mm a').format(session.sessionStartTime)}',
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                        onDeleted: () {
+                          setState(() {
+                            _selectedActivitySessionIds.remove(sessionId);
+                          });
+                        },
+                        backgroundColor: AppColors.success.withOpacity(0.1),
+                        deleteIcon: const Icon(Icons.close, size: 16),
+                      );
+                    } catch (e) {
+                      return const SizedBox.shrink();
+                    }
+                  }).toList(),
+                );
+              }
+              return const Center(child: CircularProgressIndicator());
+            },
+          ),
+      ],
+    );
+  }
+
+  /// Fetch client-specific activity sessions
+  Future<List<ActivitySession>> _fetchClientActivitySessions() async {
+    if (_selectedClientId == null) return [];
+    try {
+      final activitySessionService = ref.read(activitySessionServiceProvider);
+      return await activitySessionService.listSessions(
+        clientId: _selectedClientId!,
+        limit: 100,
+      );
+    } catch (e) {
+      print('Error fetching activity sessions: $e');
+      return [];
+    }
+  }
+
+  /// Select activity sessions dialog
+  Future<void> _selectActivitySessions() async {
+    if (_selectedClientId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a client first'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // Fetch client activity sessions
+    final sessions = await _fetchClientActivitySessions();
+
+    if (!mounted) return;
+    Navigator.pop(context); // Close loading
+
+    if (sessions.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No activity sessions found for this client'),
+          backgroundColor: AppColors.warning,
+        ),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) => DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.5,
+          maxChildSize: 0.9,
+          expand: false,
+          builder: (context, scrollController) => Container(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              children: [
+                const Text(
+                  'Select Activity Sessions',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Select activity sessions that occurred during this shift',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: sessions.length,
+                    itemBuilder: (context, index) {
+                      final session = sessions[index];
+                      final isSelected = _selectedActivitySessionIds.contains(session.id);
+                      return CheckboxListTile(
+                        title: Text(session.activityTitle ?? 'Activity Session'),
+                        subtitle: Text(
+                          '${DateFormat('MMM d, yyyy • h:mm a').format(session.sessionStartTime)} • ${session.durationMinutes} min',
+                        ),
+                        value: isSelected,
+                        onChanged: (value) {
+                          setModalState(() {
+                            if (value == true) {
+                              _selectedActivitySessionIds.add(session.id);
+                            } else {
+                              _selectedActivitySessionIds.remove(session.id);
+                            }
+                          });
+                          setState(() {});
+                        },
+                        activeColor: AppColors.primary,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: Text('Done (${_selectedActivitySessionIds.length} selected)'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Build behaviours field
   Widget _buildBehavioursField() {
     return Column(
@@ -968,15 +1209,23 @@ class _CreateShiftNoteScreenState
           controller: _behavioursController,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Note any behaviours, mood, and level of engagement...',
-            hintStyle: const TextStyle(color: AppColors.textSecondary),
             filled: true,
-            fillColor: AppColors.grey100,
+            fillColor: AppColors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderSide: const BorderSide(color: AppColors.borderLight),
             ),
-            contentPadding: const EdgeInsets.all(12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.borderLight),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
+            hintText: 'Note any behaviours, mood, and level of engagement...',
+            hintStyle: const TextStyle(color: AppColors.textSecondary),
+            contentPadding: const EdgeInsets.all(16),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
@@ -1019,9 +1268,10 @@ class _CreateShiftNoteScreenState
         const SizedBox(height: 8),
         if (_selectedGoalIds.isEmpty)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(32),
             decoration: BoxDecoration(
-              color: AppColors.grey100,
+              color: AppColors.white,
+              border: Border.all(color: AppColors.borderLight),
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Center(
@@ -1212,83 +1462,26 @@ class _CreateShiftNoteScreenState
           controller: _progressNotesController,
           maxLines: 5,
           decoration: InputDecoration(
-            hintText: 'Describe progress made towards the selected goal...',
+            hintText: 'Document progress, observations, and any other relevant notes...',
             hintStyle: const TextStyle(color: AppColors.textSecondary),
             filled: true,
-            fillColor: AppColors.grey100,
+            fillColor: AppColors.white,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide.none,
+              borderSide: const BorderSide(color: AppColors.borderLight),
             ),
-            contentPadding: const EdgeInsets.all(12),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.borderLight),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(16),
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+            ),
+            contentPadding: const EdgeInsets.all(16),
           ),
         ),
       ],
-    );
-  }
-
-  /// Build Format with AI button
-  Widget _buildFormatWithAIButton() {
-    return InkWell(
-      onTap: _formatWithAI,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [AppColors.deepBrown, AppColors.burntOrange],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.deepBrown.withValues(alpha: 0.3),
-              blurRadius: 8,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.2),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Format with AI',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Text(
-                    'Let Agnovat Assistant format your notes',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -1401,48 +1594,6 @@ class _CreateShiftNoteScreenState
     );
   }
 
-  /// Format notes with AI
-  Future<void> _formatWithAI() async {
-    // Gather all notes into a single string
-    final originalNotes = '''
-${_activitiesController.text.isNotEmpty ? 'Activities: ${_activitiesController.text}\n\n' : ''}${_behavioursController.text.isNotEmpty ? 'Behaviours & Engagement: ${_behavioursController.text}\n\n' : ''}${_progressNotesController.text.isNotEmpty ? 'Progress Notes: ${_progressNotesController.text}' : ''}'''
-        .trim();
-
-    if (originalNotes.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please add some notes before formatting'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    // Navigate to AI formatting screen
-    final formattedNotes = await Navigator.of(context).push<String>(
-      MaterialPageRoute(
-        builder: (context) => AiFormattingScreen(
-          shiftNoteId: widget.shiftNote?.id, // Pass ID if editing existing note
-          originalNotes: originalNotes,
-        ),
-      ),
-    );
-
-    // If user chose to use formatted version, update progress notes
-    if (formattedNotes != null && mounted) {
-      setState(() {
-        _progressNotesController.text = formattedNotes;
-      });
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Formatted notes applied successfully!'),
-          backgroundColor: AppColors.success,
-        ),
-      );
-    }
-  }
-
   /// Save shift note
   Future<void> _saveShiftNote() async {
     // Validate client selection
@@ -1474,8 +1625,6 @@ ${_activitiesController.text.isNotEmpty ? 'Activities: ${_activitiesController.t
       final apiService = ref.read(mcpApiServiceProvider);
       final authState = ref.read(authProvider);
       final isEditing = widget.shiftNote != null;
-
-      print(isEditing ? '✏️ Updating shift note...' : '💾 Creating shift note...');
 
       // Get user ID from current user
       final userId = authState.user?.id;
@@ -1514,25 +1663,14 @@ ${_progressNotesController.text}'''
       if (isEditing) {
         // Update existing shift note
         // Note: Convex doesn't allow updating shift date/time after creation
-        print('   - shift_note_id: ${widget.shiftNote!.id}');
-        print('   - updating notes, locations, and activities only');
-
         result = await apiService.updateShiftNote(
           shiftNoteId: widget.shiftNote!.id,
           primaryLocations: locations,
           rawNotes: rawNotes,
           activityIds: activityIds,
         );
-
-        print('✅ Shift note updated successfully');
       } else {
         // Create new shift note
-        print('   - client_id: $clientId');
-        print('   - user_id: $userId');
-        print('   - shift_date: $formattedDate');
-        print('   - start_time: $formattedStartTime');
-        print('   - end_time: $formattedEndTime');
-
         result = await apiService.createShiftNote(
           clientId: clientId,
           userId: userId,
@@ -1543,8 +1681,26 @@ ${_progressNotesController.text}'''
           rawNotes: rawNotes,
           activityIds: activityIds,
         );
+      }
 
-        print('✅ Shift note created successfully: ${result['id']}');
+      // Link selected activity sessions to this shift note
+      if (_selectedActivitySessionIds.isNotEmpty) {
+        print('🔗 Linking ${_selectedActivitySessionIds.length} activity sessions to shift note...');
+        final activitySessionService = ref.read(activitySessionServiceProvider);
+        final shiftNoteId = result['_id'] ?? result['id'];
+
+        for (final sessionId in _selectedActivitySessionIds) {
+          try {
+            await activitySessionService.updateSession(
+              sessionId,
+              {'shift_note_id': shiftNoteId},
+            );
+            print('✅ Linked session $sessionId to shift note');
+          } catch (e) {
+            print('⚠️ Failed to link session $sessionId: $e');
+            // Continue linking other sessions even if one fails
+          }
+        }
       }
 
       // Refresh shift notes list
@@ -1553,8 +1709,8 @@ ${_progressNotesController.text}'''
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isEditing 
-                ? 'Shift note updated successfully!' 
+            content: Text(isEditing
+                ? 'Shift note updated successfully!'
                 : 'Shift note saved successfully!'),
             backgroundColor: AppColors.success,
           ),
@@ -1607,7 +1763,6 @@ ${_progressNotesController.text}'''
       final authState = ref.read(authProvider);
       final isEditing = widget.shiftNote != null;
 
-      print(isEditing ? '✏️ Updating draft...' : '📝 Saving shift note as draft...');
 
       // Get user ID from current user
       final userId = authState.user?.id;
@@ -1653,7 +1808,6 @@ ${_progressNotesController.text}'''
           activityIds: activityIds,
         );
 
-        print('✅ Draft updated successfully');
       } else {
         // Create new draft (without formatted_note means it's a draft)
         result = await apiService.createShiftNote(
@@ -1666,8 +1820,23 @@ ${_progressNotesController.text}'''
           rawNotes: rawNotes,
           activityIds: activityIds,
         );
+      }
 
-        print('✅ Draft saved successfully: ${result['id']}');
+      // Link selected activity sessions to this shift note
+      if (_selectedActivitySessionIds.isNotEmpty) {
+        final activitySessionService = ref.read(activitySessionServiceProvider);
+        final shiftNoteId = result['_id'] ?? result['id'];
+
+        for (final sessionId in _selectedActivitySessionIds) {
+          try {
+            await activitySessionService.updateSession(
+              sessionId,
+              {'shift_note_id': shiftNoteId},
+            );
+          } catch (e) {
+            // Continue linking other sessions even if one fails
+          }
+        }
       }
 
       // Refresh shift notes list
@@ -1676,8 +1845,8 @@ ${_progressNotesController.text}'''
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isEditing 
-                ? 'Draft updated successfully!' 
+            content: Text(isEditing
+                ? 'Draft updated successfully!'
                 : 'Draft saved successfully!'),
             backgroundColor: AppColors.success,
           ),

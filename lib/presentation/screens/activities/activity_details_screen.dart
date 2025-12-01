@@ -5,7 +5,7 @@ import '../../../core/config/app_colors.dart';
 import '../../../core/providers/service_providers.dart';
 import '../../../data/models/activity.dart';
 import '../../providers/dashboard_provider.dart';
-import '../shift_notes/create_shift_note_screen.dart';
+import '../shift_notes/unified_shift_note_wizard.dart';
 
 /// Activity Details Screen
 /// Displays detailed information about a specific activity
@@ -534,7 +534,7 @@ class _ActivityDetailsScreenState
       if (context.mounted) {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => const CreateShiftNoteScreen(),
+            builder: (context) => const UnifiedShiftNoteWizard(),
           ),
         );
       }

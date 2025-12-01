@@ -19,13 +19,6 @@ if [ -z "$CLERK_FRONTEND_API_PROD" ]; then
     exit 1
 fi
 
-if [ -z "$CLAUDE_API_KEY" ]; then
-    echo "⚠️  Warning: CLAUDE_API_KEY not set - AI features will not work"
-    echo "   Consider moving Claude API to backend for production"
-    CLAUDE_KEY="YOUR_CLAUDE_API_KEY"
-else
-    CLAUDE_KEY="$CLAUDE_API_KEY"
-fi
 
 # Check Android keystore exists
 if [ ! -f "android/key.properties" ]; then
@@ -36,7 +29,6 @@ fi
 
 echo "Environment: PRODUCTION"
 echo "Clerk: ${CLERK_FRONTEND_API_PROD}"
-echo "Claude API: Configured"
 echo ""
 
 # Prompt for confirmation
@@ -54,8 +46,7 @@ flutter build ios --release \
   --obfuscate \
   --split-debug-info=./debug-info/ios \
   --dart-define=CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY_PROD" \
-  --dart-define=CLERK_FRONTEND_API="$CLERK_FRONTEND_API_PROD" \
-  --dart-define=CLAUDE_API_KEY="$CLAUDE_KEY"
+  --dart-define=CLERK_FRONTEND_API="$CLERK_FRONTEND_API_PROD"
 
 if [ $? -eq 0 ]; then
     echo "✅ iOS build successful"
@@ -71,8 +62,7 @@ flutter build appbundle --release \
   --obfuscate \
   --split-debug-info=./debug-info/android \
   --dart-define=CLERK_PUBLISHABLE_KEY="$CLERK_PUBLISHABLE_KEY_PROD" \
-  --dart-define=CLERK_FRONTEND_API="$CLERK_FRONTEND_API_PROD" \
-  --dart-define=CLAUDE_API_KEY="$CLAUDE_KEY"
+  --dart-define=CLERK_FRONTEND_API="$CLERK_FRONTEND_API_PROD"
 
 if [ $? -eq 0 ]; then
     echo "✅ Android build successful"
