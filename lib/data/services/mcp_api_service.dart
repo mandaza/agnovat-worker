@@ -391,16 +391,26 @@ class McpApiService {
   }) async {
     final args = <String, dynamic>{};
     if (clientId != null) args['client_id'] = clientId;
-    if (stakeholderId != null) args['stakeholder_id'] = stakeholderId;
+    if (stakeholderId != null) args['user_id'] = stakeholderId; // Backend expects user_id, not stakeholder_id
     if (dateFrom != null) args['date_from'] = dateFrom;
     if (dateTo != null) args['date_to'] = dateTo;
     if (limit != null) args['limit'] = limit;
     if (offset != null) args['offset'] = offset;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query(
       ApiConfig.shiftNotesList,
       args: args,
     );
+
+    // Handle null or non-list results
+    if (result == null) {
+      return [];
+    }
+    
+    // Check if result is a list
+    if (result is! List) {
+      return [];
+    }
 
     return result.cast<Map<String, dynamic>>();
   }

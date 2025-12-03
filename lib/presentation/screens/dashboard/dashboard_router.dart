@@ -5,6 +5,7 @@ import '../../providers/auth_provider.dart';
 import 'worker_dashboard_screen.dart';
 import 'guardian_dashboard_screen.dart';
 import 'coordinator_dashboard_screen.dart';
+import 'behavior_practitioner_dashboard_screen.dart';
 
 /// Dashboard router that routes users to appropriate dashboard based on their role
 class DashboardRouter extends ConsumerWidget {
@@ -95,6 +96,10 @@ class DashboardRouter extends ConsumerWidget {
       case UserRole.therapist:
         // Therapists get worker dashboard for now (can be customized later)
         return const WorkerDashboardScreen();
+
+      case UserRole.behaviorPractitioner:
+        // Behavior practitioners get their own dashboard
+        return const BehaviorPractitionerDashboardScreen();
 
       case UserRole.client:
         // Clients get worker dashboard for now (can be customized later)

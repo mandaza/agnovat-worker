@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/service_providers.dart';
 import '../../data/models/shift_note.dart';
+import '../providers/auth_provider.dart';
 
 /// Shift Note filter options
 enum ShiftNoteFilter {
@@ -117,12 +118,38 @@ class ShiftNotesNotifier extends AutoDisposeNotifier<ShiftNotesState> {
   Future<void> _fetchShiftNotes() async {
     try {
       final apiService = ref.read(mcpApiServiceProvider);
+      
+      // Get current user ID from auth provider to filter shift notes
+      final authState = ref.read(authProvider);
+      final currentUserId = authState.user?.id;
+      
+      if (currentUserId == null) {
+        // No user logged in, return empty list
+        state = state.copyWith(
+          isLoading: false,
+          error: 'User not authenticated',
+          shiftNotes: [],
+          filteredShiftNotes: [],
+        );
+        return;
+      }
 
-      // Fetch shift notes as JSON
+      // Fetch shift notes as JSON, filtered by current user's ID
       final shiftNotesJson = await apiService.listShiftNotes(
         limit: 50,
-        // Add clientId if filtering by specific client
+        stakeholderId: currentUserId, // Filter by current user
       );
+
+      // Handle null or empty results
+      if (shiftNotesJson.isEmpty) {
+        state = state.copyWith(
+          isLoading: false,
+          error: null,
+          shiftNotes: [],
+          filteredShiftNotes: [],
+        );
+        return;
+      }
 
       // Convert JSON to ShiftNote objects
       final shiftNotes = shiftNotesJson

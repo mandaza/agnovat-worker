@@ -35,11 +35,12 @@ enum BehaviorSeverity {
 @freezed
 class BehaviorIncident with _$BehaviorIncident {
   const factory BehaviorIncident({
-    required String id, // Local ID for the incident
+    required String id, // Local ID for the incident (UUID)
+    @JsonKey(name: 'convex_id') String? convexId, // Convex database ID (for reviews)
     @JsonKey(name: 'behaviors_displayed') required List<String> behaviorsDisplayed,
     required String duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson) required BehaviorSeverity severity,
-    @JsonKey(name: 'self_harm') required bool selfHarm,
+    @JsonKey(name: 'self_harm', fromJson: _boolFromJson) required bool selfHarm,
     @JsonKey(name: 'self_harm_types') @Default([]) List<String> selfHarmTypes,
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt) @Default(0) int selfHarmCount,
     @JsonKey(name: 'initial_intervention') required String initialIntervention,
@@ -60,6 +61,17 @@ int _selfHarmCountToInt(dynamic value) {
   if (value is double) return value.round();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
+}
+
+/// Helper to convert nullable bool to bool (defaults to false if null)
+bool _boolFromJson(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is String) {
+    return value.toLowerCase() == 'true' || value == '1';
+  }
+  if (value is int) return value != 0;
+  return false;
 }
 
 /// Helper functions for BehaviorSeverity JSON conversion

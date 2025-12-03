@@ -1315,6 +1315,8 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
         return 'Support Worker';
       case UserRole.therapist:
         return 'Therapist';
+      case UserRole.behaviorPractitioner:
+        return 'Behavior Practitioner';
       case UserRole.family:
         return 'Family Member';
       case UserRole.client:

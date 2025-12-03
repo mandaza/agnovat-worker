@@ -2097,7 +2097,7 @@ class _ActivitySessionFormScreenState
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _buildSectionLabel('Photos & Videos (${_uploadedMedia.length})'),
+            _buildSectionLabel('Photos (${_uploadedMedia.length})'),
             if (!_isUploadingMedia)
               TextButton.icon(
                 onPressed: _showMediaOptions,
@@ -2141,7 +2141,7 @@ class _ActivitySessionFormScreenState
             ),
             child: const Center(
               child: Text(
-                'No photos or videos added',
+                'No photos added',
                 style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
               ),
             ),
@@ -2407,7 +2407,7 @@ class _ActivitySessionFormScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Add Photo or Video',
+                'Add Photo',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -2445,36 +2445,6 @@ class _ActivitySessionFormScreenState
                   _uploadMediaFromGallery(MediaType.photo);
                 },
               ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.videocam, color: AppColors.goldenAmber),
-                ),
-                title: const Text('Record Video'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _uploadMediaFromCamera(MediaType.video);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.video_library, color: AppColors.goldenAmber),
-                ),
-                title: const Text('Choose Video from Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _uploadMediaFromGallery(MediaType.video);
-                },
-              ),
             ],
           ),
         ),
@@ -2487,30 +2457,64 @@ class _ActivitySessionFormScreenState
 
     try {
       final mediaService = ref.read(mediaUploadServiceProvider);
-      UploadedMedia? uploaded;
 
       if (type == MediaType.photo) {
-        uploaded = await mediaService.pickAndUploadImageFromGallery();
-      } else {
-        uploaded = await mediaService.pickAndUploadVideoFromGallery();
-      }
+        // If replacing, use single selection; otherwise use multiple selection
+        if (replaceIndex != null) {
+          // Single selection for replacement
+          final uploaded = await mediaService.pickAndUploadImageFromGallery();
+          if (uploaded != null) {
+            setState(() {
+              _uploadedMedia[replaceIndex] = uploaded;
+            });
 
-      if (uploaded != null) {
-        setState(() {
-          if (replaceIndex != null) {
-            _uploadedMedia[replaceIndex] = uploaded!;
-          } else {
-            _uploadedMedia.add(uploaded!);
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Photo replaced successfully!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            }
           }
-        });
+        } else {
+          // Multiple selection for adding new photos
+          final uploadedList = await mediaService.pickAndUploadMultipleImagesFromGallery();
+          if (uploadedList.isNotEmpty) {
+            setState(() {
+              _uploadedMedia.addAll(uploadedList);
+            });
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('${type == MediaType.photo ? 'Photo' : 'Video'} uploaded successfully!'),
-              backgroundColor: AppColors.success,
-            ),
-          );
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('${uploadedList.length} photo${uploadedList.length > 1 ? 's' : ''} uploaded successfully!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+            }
+          }
+        }
+      } else {
+        // Video (single selection only)
+        final uploaded = await mediaService.pickAndUploadVideoFromGallery();
+        if (uploaded != null) {
+          setState(() {
+            if (replaceIndex != null) {
+              _uploadedMedia[replaceIndex] = uploaded;
+            } else {
+              _uploadedMedia.add(uploaded);
+            }
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Video uploaded successfully!'),
+                backgroundColor: AppColors.success,
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -2592,7 +2596,7 @@ class _ActivitySessionFormScreenState
             mainAxisSize: MainAxisSize.min,
             children: [
               const Text(
-                'Replace Media',
+                'Replace Photo',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
@@ -2628,36 +2632,6 @@ class _ActivitySessionFormScreenState
                 onTap: () {
                   Navigator.pop(context);
                   _uploadMediaFromGallery(MediaType.photo, replaceIndex: index);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.videocam, color: AppColors.goldenAmber),
-                ),
-                title: const Text('Record Video'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _uploadMediaFromCamera(MediaType.video, replaceIndex: index);
-                },
-              ),
-              ListTile(
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(Icons.video_library, color: AppColors.goldenAmber),
-                ),
-                title: const Text('Choose Video from Gallery'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _uploadMediaFromGallery(MediaType.video, replaceIndex: index);
                 },
               ),
             ],

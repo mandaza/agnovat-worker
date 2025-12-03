@@ -7,6 +7,7 @@ enum UserRole {
   supportCoordinator,
   supportWorker,
   therapist,
+  behaviorPractitioner,
   family,
   client,
 }
@@ -97,6 +98,19 @@ class User extends Equatable {
 
   /// Create from JSON
   factory User.fromJson(Map<String, dynamic> json) {
+    // Helper to convert snake_case to camelCase for role matching
+    String normalizeRoleName(String roleName) {
+      // Convert snake_case to camelCase
+      if (roleName.contains('_')) {
+        final parts = roleName.split('_');
+        return parts[0] + parts.sublist(1).map((p) => p[0].toUpperCase() + p.substring(1)).join();
+      }
+      return roleName;
+    }
+
+    final roleString = (json['role'] as String?) ?? 'supportWorker';
+    final normalizedRole = normalizeRoleName(roleString);
+    
     return User(
       id: json['id'] as String,
       clerkId: json['clerk_id'] as String,
@@ -104,8 +118,12 @@ class User extends Equatable {
       name: json['name'] as String,
       imageUrl: json['image_url'] as String?,
       role: UserRole.values.firstWhere(
-        (e) => e.name == json['role'],
-        orElse: () => UserRole.supportWorker,
+        (e) => e.name == normalizedRole,
+        orElse: () {
+          // Log for debugging
+          print('⚠️ Unknown role from database: "$roleString" (normalized: "$normalizedRole"). Defaulting to supportWorker.');
+          return UserRole.supportWorker;
+        },
       ),
       stakeholderId: json['stakeholder_id'] as String?,
       clientId: json['client_id'] as String?,

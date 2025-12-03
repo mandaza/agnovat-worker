@@ -10,12 +10,13 @@ _$BehaviorIncidentImpl _$$BehaviorIncidentImplFromJson(
   Map<String, dynamic> json,
 ) => _$BehaviorIncidentImpl(
   id: json['id'] as String,
+  convexId: json['convex_id'] as String?,
   behaviorsDisplayed: (json['behaviors_displayed'] as List<dynamic>)
       .map((e) => e as String)
       .toList(),
   duration: json['duration'] as String,
   severity: _severityFromJson(json['severity'] as String),
-  selfHarm: json['self_harm'] as bool,
+  selfHarm: _boolFromJson(json['self_harm']),
   selfHarmTypes:
       (json['self_harm_types'] as List<dynamic>?)
           ?.map((e) => e as String)
@@ -39,6 +40,7 @@ Map<String, dynamic> _$$BehaviorIncidentImplToJson(
   _$BehaviorIncidentImpl instance,
 ) => <String, dynamic>{
   'id': instance.id,
+  'convex_id': instance.convexId,
   'behaviors_displayed': instance.behaviorsDisplayed,
   'duration': instance.duration,
   'severity': _severityToJson(instance.severity),

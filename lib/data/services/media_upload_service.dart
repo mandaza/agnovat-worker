@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
@@ -54,6 +53,21 @@ class MediaUploadService {
       return image;
     } catch (e) {
       print('❌ Error picking image from gallery: $e');
+      rethrow;
+    }
+  }
+
+  /// Pick multiple images from gallery
+  Future<List<XFile>> pickMultipleImagesFromGallery() async {
+    try {
+      final List<XFile> images = await _picker.pickMultiImage(
+        maxWidth: 1920,
+        maxHeight: 1080,
+        imageQuality: 85,
+      );
+      return images;
+    } catch (e) {
+      print('❌ Error picking multiple images from gallery: $e');
       rethrow;
     }
   }
@@ -150,6 +164,24 @@ class MediaUploadService {
     if (file == null) return null;
 
     return await uploadFile(file, MediaType.photo);
+  }
+
+  /// Complete upload flow: pick and upload multiple images from gallery
+  Future<List<UploadedMedia>> pickAndUploadMultipleImagesFromGallery() async {
+    final files = await pickMultipleImagesFromGallery();
+    if (files.isEmpty) return [];
+
+    final List<UploadedMedia> uploadedMedia = [];
+    for (final file in files) {
+      try {
+        final uploaded = await uploadFile(file, MediaType.photo);
+        uploadedMedia.add(uploaded);
+      } catch (e) {
+        print('❌ Error uploading file ${file.name}: $e');
+        // Continue with other files even if one fails
+      }
+    }
+    return uploadedMedia;
   }
 
   /// Complete upload flow: pick and upload image from camera

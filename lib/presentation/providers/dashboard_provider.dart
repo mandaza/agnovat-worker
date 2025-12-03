@@ -76,8 +76,8 @@ class DashboardNotifier extends AutoDisposeNotifier<DashboardState> {
       // Fetch dashboard data
       final dashboardData = await apiService.getDashboard();
       
-      // Fetch active clients list (for assigned clients)
-      final clients = await apiService.listClients(active: true, limit: 5);
+      // Fetch all active clients list (for assigned clients count)
+      final clients = await apiService.listClients(active: true);
       
       // Update state with real-time data
       state = state.copyWith(

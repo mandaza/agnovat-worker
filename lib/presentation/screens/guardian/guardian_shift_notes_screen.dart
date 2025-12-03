@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/providers/service_providers.dart';
+import '../../widgets/skeleton_loader.dart';
 import '../shift_notes/shift_note_details_screen.dart';
 
 /// Guardian Shift Notes Screen - View all submitted shift notes
@@ -156,6 +157,21 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
     return notes;
   }
 
+  /// Build skeleton loader for shift notes
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: List.generate(5, (index) {
+          return const Padding(
+            padding: EdgeInsets.only(bottom: 8),
+            child: SkeletonListItem(height: 100),
+          );
+        }),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final filteredNotes = _filteredNotes;
@@ -255,10 +271,10 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
 
           // Notes List
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _error != null
-                    ? _buildErrorState()
+            child: _error != null
+                ? _buildErrorState()
+                : _isLoading && filteredNotes.isEmpty
+                    ? _buildSkeletonLoader()
                     : filteredNotes.isEmpty
                         ? _buildEmptyState()
                         : RefreshIndicator(

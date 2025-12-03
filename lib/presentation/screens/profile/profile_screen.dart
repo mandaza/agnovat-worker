@@ -201,26 +201,6 @@ class ProfileScreen extends ConsumerWidget {
 
               const SizedBox(height: 24),
 
-              // Preferences Section
-              _buildSectionTitle('Preferences'),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: _buildPreferencesSection(context),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Support Section
-              _buildSectionTitle('Help & Support'),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: _buildSupportSection(context),
-              ),
-
-              const SizedBox(height: 24),
-
               // Sign Out Button
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -557,115 +537,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// Preferences Section
-  Widget _buildPreferencesSection(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        children: [
-          _buildListTile(
-            icon: Icons.notifications_outlined,
-            title: 'Notifications',
-            subtitle: 'Manage notification preferences',
-            onTap: () {
-              // TODO: Navigate to notifications screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Notifications - Coming soon!')),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildListTile(
-            icon: Icons.language_outlined,
-            title: 'Language',
-            subtitle: 'English',
-            onTap: () {
-              // TODO: Navigate to language screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Language - Coming soon!')),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildListTile(
-            icon: Icons.dark_mode_outlined,
-            title: 'Theme',
-            subtitle: 'Light mode',
-            onTap: () {
-              // TODO: Navigate to theme screen
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Theme - Coming soon!')),
-              );
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Support Section
-  Widget _buildSupportSection(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        children: [
-          _buildListTile(
-            icon: Icons.help_outline,
-            title: 'Help Center',
-            subtitle: 'Get help and support',
-            onTap: () {
-              // TODO: Navigate to help center
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Help Center - Coming soon!')),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildListTile(
-            icon: Icons.privacy_tip_outlined,
-            title: 'Privacy Policy',
-            subtitle: 'View our privacy policy',
-            onTap: () {
-              // TODO: Navigate to privacy policy
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Privacy Policy - Coming soon!')),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildListTile(
-            icon: Icons.description_outlined,
-            title: 'Terms of Service',
-            subtitle: 'View our terms of service',
-            onTap: () {
-              // TODO: Navigate to terms of service
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Terms of Service - Coming soon!')),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildListTile(
-            icon: Icons.info_outline,
-            title: 'About',
-            subtitle: 'Version 1.0.0',
-            onTap: () {
-              _showAboutDialog(context);
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Sign Out Button
   Widget _buildSignOutButton(BuildContext context, WidgetRef ref, bool isLoading) {
     return SizedBox(
@@ -848,6 +719,8 @@ class ProfileScreen extends ConsumerWidget {
         return 'Support Worker';
       case UserRole.therapist:
         return 'Therapist';
+      case UserRole.behaviorPractitioner:
+        return 'Behavior Practitioner';
       case UserRole.family:
         return 'Family';
       case UserRole.client:
@@ -879,33 +752,4 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  /// Show about dialog
-  void _showAboutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('About Agnovat'),
-        content: const Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Agnovat Support Worker', style: TextStyle(fontWeight: FontWeight.bold)),
-            SizedBox(height: 8),
-            Text('Version 1.0.0'),
-            SizedBox(height: 16),
-            Text(
-              'Empowering support workers to provide exceptional NDIS care.',
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
 }

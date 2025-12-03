@@ -4,12 +4,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../core/config/app_colors.dart';
+import '../../../core/providers/service_providers.dart';
 import '../../../data/models/shift_note.dart';
+import '../../../data/models/user.dart';
 import '../../../data/models/activity_session.dart';
 import '../../../data/models/activity_session_enums.dart';
 import '../../../data/models/goal.dart';
 import '../../../data/services/media_upload_service.dart';
-import '../../providers/auth_provider.dart';
 import '../../providers/shift_notes_provider.dart';
 import '../../providers/shift_note_detail_provider.dart';
 import 'unified_shift_note_wizard.dart';
@@ -29,7 +30,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
     // Watch the shift note detail provider for complete data
     final detailState = ref.watch(shiftNoteDetailProvider(shiftNoteId));
 
-    // Show loading state
+    // Show loading state with skeleton
     if (detailState.isLoading) {
       return Scaffold(
         backgroundColor: AppColors.surfaceLight,
@@ -46,9 +47,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
             ),
           ),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(),
-        ),
+        body: _buildSkeletonLoader(),
       );
     }
 
@@ -237,14 +236,8 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
             onPressed: () => _editNote(context, ref, shiftNote),
             tooltip: 'Edit Note',
           ),
-        if (!isDraft)
-          IconButton(
-            icon: const Icon(Icons.print_outlined, color: AppColors.textPrimary),
-            onPressed: () => _exportShiftNote(context, shiftNote),
-            tooltip: 'Export/Print',
-          ),
         Container(
-          margin: EdgeInsets.only(right: 24, left: isDraft ? 0 : 8),
+          margin: const EdgeInsets.only(right: 24),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
             color: isDraft 
@@ -2287,10 +2280,7 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
 
 
   Widget _buildSubmittedBySection(BuildContext context, WidgetRef ref, ShiftNote shiftNote) {
-    // Get the current user's name from auth provider
-    final authState = ref.watch(authProvider);
-    final userName = authState.user?.name ?? 'Unknown User';
-    
+    // Fetch the user who submitted the shift note using shiftNote.userId
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24),
       child: Container(
@@ -2299,37 +2289,53 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
           color: AppColors.surfaceLight,
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Submitted by',
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              userName,
-              style: const TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '${DateFormat('MMM d, yyyy').format(shiftNote.createdAt)} at ${DateFormat('h:mm a').format(shiftNote.createdAt)}',
-              style: const TextStyle(
-                fontFamily: 'Nunito',
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
-            ),
-          ],
+        child: FutureBuilder<User>(
+          future: ref.read(mcpApiServiceProvider).getUserById(shiftNote.userId),
+          builder: (context, snapshot) {
+            String userName = 'Unknown User';
+            
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              userName = 'Loading...';
+            } else if (snapshot.hasData) {
+              userName = snapshot.data!.name;
+            } else if (snapshot.hasError) {
+              userName = 'Unknown User';
+              print('❌ Error fetching user: ${snapshot.error}');
+            }
+            
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Submitted by',
+                  style: TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  userName,
+                  style: const TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${DateFormat('MMM d, yyyy').format(shiftNote.createdAt)} at ${DateFormat('h:mm a').format(shiftNote.createdAt)}',
+                  style: const TextStyle(
+                    fontFamily: 'Nunito',
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -2756,39 +2762,6 @@ ${shiftNote.rawNotes}
   }
 
   /// Export shift note as text (future: could be PDF)
-  void _exportShiftNote(BuildContext context, ShiftNote shiftNote) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          'Export Shift Note',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        content: const Text(
-          'Export functionality coming soon! This will allow you to export the shift note as a PDF document.',
-          style: TextStyle(
-            fontFamily: 'Nunito',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Close',
-              style: TextStyle(
-                fontFamily: 'Nunito',
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   /// Build section divider
   Widget _buildSectionDivider(String title) {
     return Padding(
@@ -2967,6 +2940,218 @@ ${shiftNote.rawNotes}
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  /// Build skeleton loader for shift note details
+  Widget _buildSkeletonLoader() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 24),
+          // Document header skeleton
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              width: double.infinity,
+              height: 180,
+              decoration: BoxDecoration(
+                color: AppColors.grey200,
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Shift info card skeleton
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        width: 60,
+                        height: 24,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: AppColors.grey200,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 120,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: AppColors.grey200,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              width: 80,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: AppColors.grey200,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              width: 120,
+                              height: 14,
+                              decoration: BoxDecoration(
+                                color: AppColors.grey200,
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Section divider skeleton
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              width: 150,
+              height: 14,
+              decoration: BoxDecoration(
+                color: AppColors.grey200,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Activity sessions skeleton
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: List.generate(2, (index) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.white,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.borderLight),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 150,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.grey200,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Submitted by section skeleton
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.borderLight),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 100,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: AppColors.grey200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    width: 120,
+                    height: 14,
+                    decoration: BoxDecoration(
+                      color: AppColors.grey200,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
       ),
     );
   }

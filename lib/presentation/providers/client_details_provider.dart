@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/service_providers.dart';
 import '../../data/models/client.dart';
+import 'dashboard_provider.dart';
 
 /// Client details provider with auto-refresh
 /// Fetches real-time client data from Convex
@@ -91,86 +92,155 @@ final refreshClientProvider = Provider.family<void Function(), String>((ref, cli
   };
 });
 
-/// Clients list state (for immediate, cached access)
+/// Clients list state (for immediate, cached access with pagination)
 class ClientsListState {
   final List<Client> clients;
   final bool isLoading;
+  final bool isLoadingMore;
   final String? error;
+  final bool hasMore;
+  final int currentPage;
+  static const int pageSize = 20;
 
   const ClientsListState({
     this.clients = const [],
     this.isLoading = false,
+    this.isLoadingMore = false,
     this.error,
+    this.hasMore = true,
+    this.currentPage = 0,
   });
 
   ClientsListState copyWith({
     List<Client>? clients,
     bool? isLoading,
+    bool? isLoadingMore,
     String? error,
+    bool? hasMore,
+    int? currentPage,
   }) {
     return ClientsListState(
       clients: clients ?? this.clients,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: error,
+      hasMore: hasMore ?? this.hasMore,
+      currentPage: currentPage ?? this.currentPage,
     );
   }
 }
 
 /// Optimized clients list notifier with caching for instant access
-class ClientsListNotifier extends AutoDisposeNotifier<ClientsListState> {
+/// Uses keepAlive to maintain cache across navigation
+class ClientsListNotifier extends Notifier<ClientsListState> {
   Timer? _refreshTimer;
 
   @override
   ClientsListState build() {
     // Set up auto-refresh (every 30 seconds)
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      state = state.copyWith(currentPage: 0, hasMore: true);
       _fetchClients(silentRefresh: true);
     });
 
-    // Clean up timer when disposed
-    ref.onDispose(() {
-      _refreshTimer?.cancel();
-    });
+    // Try to get cached clients from dashboard provider first
+    try {
+      final dashboardState = ref.read(dashboardProvider);
+      if (dashboardState.assignedClients.isNotEmpty && !dashboardState.isLoading) {
+        // Use cached data from dashboard immediately, but still fetch fresh data
+        final cachedState = ClientsListState(
+          clients: dashboardState.assignedClients,
+          isLoading: false,
+          currentPage: 0,
+          hasMore: true,
+        );
+        // Start background refresh to get fresh data
+        Future.microtask(() {
+          state = state.copyWith(currentPage: 0, hasMore: true);
+          _fetchClients(silentRefresh: true);
+        });
+        return cachedState;
+      }
+    } catch (e) {
+      // Dashboard provider not available, continue with normal flow
+    }
 
-    // Schedule initial fetch after build completes
-    Future.microtask(() => _fetchClients());
+    // Start fetching immediately (no microtask delay)
+    _fetchClients();
 
-    // Return initial state (clients will load in background)
+    // Return initial loading state
     return const ClientsListState(isLoading: true);
   }
 
-  /// Fetch clients from API
-  Future<void> _fetchClients({bool silentRefresh = false}) async {
+  /// Fetch clients from API with pagination
+  Future<void> _fetchClients({bool silentRefresh = false, bool loadMore = false}) async {
     try {
-      if (!silentRefresh) {
+      if (loadMore) {
+        state = state.copyWith(isLoadingMore: true);
+      } else if (!silentRefresh) {
         state = state.copyWith(isLoading: true);
       }
 
       final apiService = ref.read(mcpApiServiceProvider);
-      final clients = await apiService.listClients(active: true);
-
-      state = state.copyWith(
-        clients: clients,
-        isLoading: false,
-        error: null,
+      final offset = loadMore ? state.currentPage * ClientsListState.pageSize : 0;
+      final limit = ClientsListState.pageSize;
+      
+      final clients = await apiService.listClients(
+        active: true,
+        limit: limit,
+        offset: offset,
       );
+
+      // Determine if there are more clients to load
+      final hasMore = clients.length == limit;
+
+      if (loadMore) {
+        // Append to existing list
+        state = state.copyWith(
+          clients: [...state.clients, ...clients],
+          isLoadingMore: false,
+          hasMore: hasMore,
+          currentPage: state.currentPage + 1,
+          error: null,
+        );
+      } else {
+        // Replace list (initial load or refresh)
+        state = state.copyWith(
+          clients: clients,
+          isLoading: false,
+          hasMore: hasMore,
+          currentPage: hasMore ? 1 : 0,
+          error: null,
+        );
+      }
     } catch (e) {
       state = state.copyWith(
         isLoading: false,
+        isLoadingMore: false,
         error: e.toString(),
       );
     }
   }
 
-  /// Manually refresh clients list
+  /// Load more clients (for infinite scroll)
+  Future<void> loadMore() async {
+    if (state.isLoadingMore || !state.hasMore) {
+      return;
+    }
+    await _fetchClients(loadMore: true);
+  }
+
+  /// Manually refresh clients list (resets pagination)
   Future<void> refresh() async {
+    state = state.copyWith(currentPage: 0, hasMore: true);
     await _fetchClients();
   }
 }
 
 /// Cached clients list provider (State-based for instant access)
+/// Uses keepAlive to maintain cache across navigation for seamless experience
 final clientsListCachedProvider =
-    AutoDisposeNotifierProvider<ClientsListNotifier, ClientsListState>(
+    NotifierProvider<ClientsListNotifier, ClientsListState>(
   ClientsListNotifier.new,
 );
 

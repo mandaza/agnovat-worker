@@ -3,14 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/activity.dart';
-import '../../../data/models/client.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../providers/behavior_incident_reviews_provider.dart';
 import '../profile/profile_screen.dart';
-import '../clients/client_details_screen.dart';
-import '../activities/activities_list_screen.dart';
+import '../clients/clients_list_screen.dart';
 import '../shift_notes/shift_notes_list_screen.dart';
 import '../ai_assistant/ai_assistant_screen.dart';
+import '../reviews/unacknowledged_reviews_screen.dart';
 
 /// Worker Dashboard Screen
 class WorkerDashboardScreen extends ConsumerWidget {
@@ -105,16 +105,14 @@ class WorkerDashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      body: dashboardState.isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : dashboardState.error != null
-              ? _buildError(context, dashboardState.error!)
-              : _buildDashboardContent(
-                  context,
-                  ref,
-                  dashboardState,
-                  authState.user?.name ?? 'User',
-                ),
+      body: dashboardState.error != null
+          ? _buildError(context, dashboardState.error!)
+          : _buildDashboardContent(
+              context,
+              ref,
+              dashboardState,
+              authState.user?.name ?? 'User',
+            ),
       bottomNavigationBar: _buildBottomNavigation(context),
       floatingActionButton: _buildFloatingAIButton(context),
     );
@@ -137,14 +135,14 @@ class WorkerDashboardScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // Assigned Client Section
+            // My Clients Section
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Assigned Client',
+                    'My Clients',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -152,51 +150,9 @@ class WorkerDashboardScreen extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _buildAssignedClientCard(context, state),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Quick Stats Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Quick Stats',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildQuickStatsGrid(context, state),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Quick Actions Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Quick Actions',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildQuickActionsGrid(context),
+                  state.isLoading && state.assignedClients.isEmpty
+                      ? _buildMyClientsCardSkeleton()
+                      : _buildMyClientsCard(context, ref, state),
                 ],
               ),
             ),
@@ -235,7 +191,9 @@ class WorkerDashboardScreen extends ConsumerWidget {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  _buildTodaysActivities(context, state),
+                  state.isLoading && state.todaysActivities.isEmpty
+                      ? _buildTodaysActivitiesSkeleton()
+                      : _buildTodaysActivities(context, state),
                 ],
               ),
             ),
@@ -305,10 +263,99 @@ class WorkerDashboardScreen extends ConsumerWidget {
                 ],
               ),
             ),
-            _buildProfileAvatar(context),
+            Row(
+              children: [
+                // Notification Bell
+                _buildNotificationBell(context),
+                const SizedBox(width: 12),
+                // Profile Avatar
+                _buildProfileAvatar(context),
+              ],
+            ),
           ],
         ),
       ),
+    );
+  }
+
+  // Notification bell with unacknowledged review count badge
+  Widget _buildNotificationBell(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final unacknowledgedCountAsync = ref.watch(unacknowledgedReviewCountProvider);
+
+        return unacknowledgedCountAsync.when(
+          data: (count) {
+            return Stack(
+              clipBehavior: Clip.none,
+              children: [
+                IconButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => const UnacknowledgedReviewsScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    color: AppColors.deepBrown,
+                    size: 28,
+                  ),
+                ),
+                if (count > 0)
+                  Positioned(
+                    right: 8,
+                    top: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      constraints: const BoxConstraints(
+                        minWidth: 18,
+                        minHeight: 18,
+                      ),
+                      decoration: const BoxDecoration(
+                        color: AppColors.error,
+                        shape: BoxShape.circle,
+                      ),
+                      child: Center(
+                        child: Text(
+                          count > 9 ? '9+' : '$count',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+          loading: () => IconButton(
+            onPressed: null,
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppColors.deepBrown,
+              size: 28,
+            ),
+          ),
+          error: (_, __) => IconButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const UnacknowledgedReviewsScreen(),
+                ),
+              );
+            },
+            icon: const Icon(
+              Icons.notifications_outlined,
+              color: AppColors.deepBrown,
+              size: 28,
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -405,352 +452,98 @@ class WorkerDashboardScreen extends ConsumerWidget {
     return '?';
   }
 
-  // Assigned Client Card
-  Widget _buildAssignedClientCard(BuildContext context, DashboardState state) {
-    if (state.assignedClients.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(32),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderLight),
-        ),
-        child: const Center(
-          child: Text(
-            'No client assigned',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ),
-      );
-    }
-
-    final client = state.assignedClients.first; // Show only first client
-    final goalsCount = client is ClientWithStats ? client.activeGoalsCount : null;
-
+  // My Clients Card with quick access
+  Widget _buildMyClientsCard(BuildContext context, WidgetRef ref, DashboardState state) {
+    final clientsCount = state.assignedClients.length;
+    
     return InkWell(
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ClientDetailsScreen(client: client),
+            builder: (context) => const ClientsListScreen(),
           ),
         );
       },
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        padding: const EdgeInsets.all(17),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: AppColors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(color: AppColors.borderLight),
         ),
         child: Row(
-        children: [
-          // Avatar with gradient
-          Container(
-            width: 64,
-            height: 64,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [AppColors.deepBrown, AppColors.burntOrange],
-              ),
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: Text(
-                _getInitials(client.name),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
+          children: [
+            // Icon with gradient background
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [AppColors.deepBrown, AppColors.burntOrange],
                 ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.people,
+                color: Colors.white,
+                size: 28,
               ),
             ),
-          ),
-          const SizedBox(width: 16),
-          // Client info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(width: 16),
+            // Clients info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'My Clients',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '$clientsCount client${clientsCount != 1 ? 's' : ''} assigned',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Count badge and arrow
+            Row(
               children: [
-                Text(
-                  client.name,
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.deepBrown.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Age: ${client.age} years',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Show goals count if available (ClientWithStats)
-                if (goalsCount != null)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.goldenAmber.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '$goalsCount ${goalsCount == 1 ? 'Goal' : 'Goals'} Active',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.goldenAmber,
-                      ),
+                  child: Text(
+                    '$clientsCount',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.deepBrown,
                     ),
                   ),
+                ),
+                const SizedBox(width: 8),
+                const Icon(
+                  Icons.chevron_right,
+                  color: AppColors.textSecondary,
+                ),
               ],
             ),
-          ),
-        ],
-      ),
-      ),
-    );
-  }
-
-  // Quick Stats Grid
-  Widget _buildQuickStatsGrid(BuildContext context, DashboardState state) {
-    // Get real data from state
-    final activitiesCount = _getActivitiesCount(state);
-    final goalsCount = _getTotalGoalsCount(state);
-    final submittedNotesCount = _getSubmittedNotesCount(state);
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.check_circle_outline,
-                value: '$activitiesCount',
-                label: 'Activities',
-                iconBgColor: AppColors.goldenAmber.withValues(alpha: 0.1),
-                iconColor: AppColors.goldenAmber,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.trending_up,
-                value: '$goalsCount',
-                label: 'Goals',
-                iconBgColor: AppColors.burntOrange.withValues(alpha: 0.1),
-                iconColor: AppColors.burntOrange,
-              ),
-            ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.description_outlined,
-                value: '$submittedNotesCount',
-                label: 'Submitted Notes',
-                iconBgColor: AppColors.grey100,
-                iconColor: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: SizedBox()),
-          ],
-        ),
-      ],
-    );
-  }
-
-  /// Get all activities count from dashboard data
-  int _getActivitiesCount(DashboardState state) {
-    if (state.data == null) return 0;
-    // Count all recent activities
-    return state.data!.recentActivities.length;
-  }
-
-  /// Get total goals count from dashboard data
-  int _getTotalGoalsCount(DashboardState state) {
-    if (state.data == null) return 0;
-    // Get total goals count from dashboard data
-    return state.data!.totalGoals;
-  }
-
-  /// Get submitted notes count from dashboard data
-  int _getSubmittedNotesCount(DashboardState state) {
-    if (state.data == null) return 0;
-    // Count only submitted shift notes
-    return state.data!.recentShiftNotes
-        .where((note) => note['status'] == 'submitted')
-        .length;
-  }
-
-  // Quick Actions Grid
-  Widget _buildQuickActionsGrid(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                context: context,
-                icon: Icons.description_outlined,
-                label: 'Shift Notes',
-                color: AppColors.deepBrown,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ShiftNotesListScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildActionCard(
-                context: context,
-                icon: Icons.event_note,
-                label: 'Activities',
-                color: AppColors.goldenAmber,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const ActivitiesListScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _buildActionCard(
-                context: context,
-                icon: Icons.chat_bubble_outline,
-                label: 'AI Assistant',
-                color: AppColors.tealBlue,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (context) => const AiAssistantScreen(),
-                    ),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: SizedBox()),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _buildActionCard({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.all(17),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderLight),
-        ),
-        child: Column(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(icon, color: color, size: 24),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-                color: AppColors.textPrimary,
-              ),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color iconBgColor,
-    required Color iconColor,
-  }) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(17, 17, 17, 1),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  color: iconBgColor,
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: iconColor, size: 16),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -893,10 +686,10 @@ class WorkerDashboardScreen extends ConsumerWidget {
               // Already on dashboard
               break;
             case 1:
-              // Activities
+              // Clients
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => const ActivitiesListScreen(),
+                  builder: (context) => const ClientsListScreen(),
                 ),
               );
               break;
@@ -923,8 +716,8 @@ class WorkerDashboardScreen extends ConsumerWidget {
             label: 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.event_note),
-            label: 'Activities',
+            icon: Icon(Icons.people),
+            label: 'Clients',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.description),
@@ -992,16 +785,6 @@ class WorkerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  String _getInitials(String name) {
-    final parts = name.split(' ');
-    if (parts.length >= 2) {
-      return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-    } else if (parts.isNotEmpty) {
-      return parts[0][0].toUpperCase();
-    }
-    return '?';
-  }
-
   Widget _buildError(BuildContext context, String error) {
     return Center(
       child: Padding(
@@ -1030,6 +813,107 @@ class WorkerDashboardScreen extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Build skeleton for My Clients card
+  Widget _buildMyClientsCardSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 120,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.grey200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                width: 80,
+                height: 14,
+                decoration: BoxDecoration(
+                  color: AppColors.grey200,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+            ],
+          ),
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: AppColors.grey200,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Build skeleton for Today's Activities
+  Widget _buildTodaysActivitiesSkeleton() {
+    return Column(
+      children: List.generate(3, (index) {
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderLight),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.grey200,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppColors.grey200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      width: 150,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: AppColors.grey200,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }),
     );
   }
 }

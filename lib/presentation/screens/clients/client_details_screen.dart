@@ -6,6 +6,7 @@ import '../../../data/models/goal.dart';
 import '../../../data/models/activity.dart';
 import '../../../core/providers/service_providers.dart';
 import '../../../core/config/api_config.dart';
+import '../../providers/auth_provider.dart';
 
 /// Provider for client goals list
 final _goalsListProvider = FutureProvider.autoDispose.family<List<Goal>, String>((ref, clientId) async {
@@ -26,7 +27,31 @@ final _activitiesListProvider = FutureProvider.autoDispose.family<List<Activity>
 /// Provider for client shift notes list
 final _shiftNotesListProvider = FutureProvider.autoDispose.family<List<Map<String, dynamic>>, String>((ref, clientId) async {
   final apiService = ref.watch(mcpApiServiceProvider);
-  return await apiService.listShiftNotes(clientId: clientId, limit: 20);
+  
+  // Get current user ID from auth provider to filter shift notes
+  final authState = ref.read(authProvider);
+  final currentUserId = authState.user?.id;
+  
+  if (currentUserId == null) {
+    // No user logged in, return empty list
+    return [];
+  }
+  
+  try {
+    // Filter by both clientId and current user's ID (stakeholderId)
+    final shiftNotes = await apiService.listShiftNotes(
+      clientId: clientId,
+      stakeholderId: currentUserId, // Filter by current user
+      limit: 20,
+    );
+    
+    // Return empty list if null or ensure it's a list
+    return shiftNotes;
+  } catch (e) {
+    // Return empty list on error to prevent crashes
+    print('Error loading shift notes: $e');
+    return [];
+  }
 });
 
 /// Client Details Screen
