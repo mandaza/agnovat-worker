@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/activity.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/dashboard_provider.dart';
 import '../../providers/behavior_incident_reviews_provider.dart';
+import '../../utils/logout_helper.dart';
 import '../profile/profile_screen.dart';
 import '../clients/clients_list_screen.dart';
 import '../shift_notes/shift_notes_list_screen.dart';
@@ -20,6 +20,18 @@ class WorkerDashboardScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final dashboardState = ref.watch(dashboardProvider);
+
+    // If user is logged out or logging out, return to login immediately.
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     // Show loading while initializing auth
     if (authState.isLoading) {
@@ -84,12 +96,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: () async {
-                    // Sign out and navigate to sign-in
-                    final clerkAuth = ClerkAuth.of(context);
-                    await clerkAuth.signOut();
-                    if (context.mounted) {
-                      Navigator.of(context).popUntil((route) => route.isFirst);
-                    }
+                    await performLogout(context, ref);
                   },
                   child: const Text(
                     'Sign Out',

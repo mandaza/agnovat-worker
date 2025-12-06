@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../profile/profile_screen.dart';
+import '../../utils/logout_helper.dart';
 
 /// Support Coordinator Dashboard Screen
 class CoordinatorDashboardScreen extends ConsumerStatefulWidget {
@@ -23,6 +23,18 @@ class _CoordinatorDashboardScreenState
   Widget build(BuildContext context) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+
+    // If user is logged out or logging out, return to login immediately.
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (user == null) {
       return const Scaffold(
@@ -592,8 +604,7 @@ class _CoordinatorDashboardScreenState
               title: const Text('Sign Out'),
               onTap: () async {
                 Navigator.pop(context);
-                final clerkAuth = ClerkAuth.of(context);
-                await clerkAuth.signOut();
+                await performLogout(context, ref);
               },
             ),
           ],

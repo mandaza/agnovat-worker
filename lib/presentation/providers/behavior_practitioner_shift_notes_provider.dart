@@ -124,7 +124,7 @@ class BehaviorPractitionerShiftNotesNotifier extends AutoDisposeNotifier<Behavio
       // Fetch ALL shift notes (behavior practitioners see all submitted notes)
       // Don't pass stakeholderId to get all notes
       final shiftNotesJson = await apiService.listShiftNotes(
-        limit: 100,
+        limit: 200, // Increased to get more notes
       );
 
       // Handle null or empty results
@@ -138,9 +138,11 @@ class BehaviorPractitionerShiftNotesNotifier extends AutoDisposeNotifier<Behavio
         return;
       }
 
-      // Convert JSON to ShiftNote objects
+      // Convert JSON to ShiftNote objects and FILTER OUT DRAFTS
+      // Behavior practitioners should NEVER see drafts - only submitted notes
       final shiftNotes = shiftNotesJson
           .map((json) => ShiftNote.fromJson(json))
+          .where((note) => note.isSubmitted) // Only show submitted notes, never drafts
           .toList();
 
       // Apply filters
@@ -170,14 +172,17 @@ class BehaviorPractitionerShiftNotesNotifier extends AutoDisposeNotifier<Behavio
     BehaviorPractitionerShiftNoteFilter statusFilter,
     String searchQuery,
   ) {
-    var filtered = notes;
+    // All notes here are already filtered to be submitted only
+    // Behavior practitioners should NEVER see drafts
+    var filtered = notes.where((note) => note.isSubmitted).toList();
 
-    // Apply status filter
+    // Apply status filter (but drafts filter should never match since we filtered them out)
     if (statusFilter != BehaviorPractitionerShiftNoteFilter.all) {
       filtered = filtered.where((note) {
         switch (statusFilter) {
           case BehaviorPractitionerShiftNoteFilter.draft:
-            return note.isDraft;
+            // This should never match - behavior practitioners don't see drafts
+            return false;
           case BehaviorPractitionerShiftNoteFilter.submitted:
             return note.isSubmitted;
           default:

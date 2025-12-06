@@ -1,13 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/guardian_dashboard_provider.dart';
 import '../profile/profile_screen.dart';
 import '../guardian/guardian_shift_notes_screen.dart';
+import '../../utils/logout_helper.dart';
 
 /// Guardian Dashboard Screen for Super Guardians and Managers
 class GuardianDashboardScreen extends ConsumerStatefulWidget {
@@ -26,6 +27,18 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
     final authState = ref.watch(authProvider);
     final user = authState.user;
     final dashboardState = ref.watch(guardianDashboardProvider);
+
+    // If user is logged out or logging out, return to login immediately.
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (user == null) {
       return const Scaffold(
@@ -170,6 +183,9 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
 
   // EXISTING HEADER - Keep as is
   Widget _buildHeader(BuildContext context, User user) {
+    // Prefer Convex user image, but fall back to Clerk profile image if missing.
+    final clerkUser = ClerkAuth.of(context).user;
+    final profileImageUrl = user.imageUrl ?? clerkUser?.imageUrl;
     final firstName = user.name.split(' ').first;
 
     return Container(
@@ -215,10 +231,9 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
                     child: CircleAvatar(
                       radius: 24,
                       backgroundColor: AppColors.goldenAmber,
-                      backgroundImage: user.imageUrl != null
-                          ? NetworkImage(user.imageUrl!)
-                          : null,
-                      child: user.imageUrl == null
+                      backgroundImage:
+                          profileImageUrl != null ? NetworkImage(profileImageUrl) : null,
+                      child: profileImageUrl == null
                           ? Text(
                               firstName[0].toUpperCase(),
                               style: const TextStyle(
@@ -1283,8 +1298,7 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
               title: const Text('Sign Out'),
               onTap: () async {
                 Navigator.pop(context);
-                final clerkAuth = ClerkAuth.of(context);
-                await clerkAuth.signOut();
+                await performLogout(context, ref);
               },
             ),
           ],

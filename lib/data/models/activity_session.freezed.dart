@@ -29,9 +29,7 @@ mixin _$BehaviorIncident {
   List<String> get behaviorsDisplayed => throw _privateConstructorUsedError;
   String get duration => throw _privateConstructorUsedError;
   @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
-  BehaviorSeverity get severity => throw _privateConstructorUsedError;
-  @JsonKey(name: 'self_harm', fromJson: _boolFromJson)
-  bool get selfHarm => throw _privateConstructorUsedError;
+  BehaviorSeverity get severity => throw _privateConstructorUsedError; // Note: self_harm boolean removed - derived from self_harm_types/count
   @JsonKey(name: 'self_harm_types')
   List<String> get selfHarmTypes => throw _privateConstructorUsedError;
   @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt)
@@ -70,7 +68,6 @@ abstract class $BehaviorIncidentCopyWith<$Res> {
     String duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
     BehaviorSeverity severity,
-    @JsonKey(name: 'self_harm', fromJson: _boolFromJson) bool selfHarm,
     @JsonKey(name: 'self_harm_types') List<String> selfHarmTypes,
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt)
     int selfHarmCount,
@@ -103,7 +100,6 @@ class _$BehaviorIncidentCopyWithImpl<$Res, $Val extends BehaviorIncident>
     Object? behaviorsDisplayed = null,
     Object? duration = null,
     Object? severity = null,
-    Object? selfHarm = null,
     Object? selfHarmTypes = null,
     Object? selfHarmCount = null,
     Object? initialIntervention = null,
@@ -134,10 +130,6 @@ class _$BehaviorIncidentCopyWithImpl<$Res, $Val extends BehaviorIncident>
                 ? _value.severity
                 : severity // ignore: cast_nullable_to_non_nullable
                       as BehaviorSeverity,
-            selfHarm: null == selfHarm
-                ? _value.selfHarm
-                : selfHarm // ignore: cast_nullable_to_non_nullable
-                      as bool,
             selfHarmTypes: null == selfHarmTypes
                 ? _value.selfHarmTypes
                 : selfHarmTypes // ignore: cast_nullable_to_non_nullable
@@ -188,7 +180,6 @@ abstract class _$$BehaviorIncidentImplCopyWith<$Res>
     String duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
     BehaviorSeverity severity,
-    @JsonKey(name: 'self_harm', fromJson: _boolFromJson) bool selfHarm,
     @JsonKey(name: 'self_harm_types') List<String> selfHarmTypes,
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt)
     int selfHarmCount,
@@ -220,7 +211,6 @@ class __$$BehaviorIncidentImplCopyWithImpl<$Res>
     Object? behaviorsDisplayed = null,
     Object? duration = null,
     Object? severity = null,
-    Object? selfHarm = null,
     Object? selfHarmTypes = null,
     Object? selfHarmCount = null,
     Object? initialIntervention = null,
@@ -251,10 +241,6 @@ class __$$BehaviorIncidentImplCopyWithImpl<$Res>
             ? _value.severity
             : severity // ignore: cast_nullable_to_non_nullable
                   as BehaviorSeverity,
-        selfHarm: null == selfHarm
-            ? _value.selfHarm
-            : selfHarm // ignore: cast_nullable_to_non_nullable
-                  as bool,
         selfHarmTypes: null == selfHarmTypes
             ? _value._selfHarmTypes
             : selfHarmTypes // ignore: cast_nullable_to_non_nullable
@@ -290,7 +276,7 @@ class __$$BehaviorIncidentImplCopyWithImpl<$Res>
 
 /// @nodoc
 @JsonSerializable()
-class _$BehaviorIncidentImpl implements _BehaviorIncident {
+class _$BehaviorIncidentImpl extends _BehaviorIncident {
   const _$BehaviorIncidentImpl({
     required this.id,
     @JsonKey(name: 'convex_id') this.convexId,
@@ -299,7 +285,6 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
     required this.duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
     required this.severity,
-    @JsonKey(name: 'self_harm', fromJson: _boolFromJson) required this.selfHarm,
     @JsonKey(name: 'self_harm_types')
     final List<String> selfHarmTypes = const [],
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt)
@@ -312,7 +297,8 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
     required this.description,
   }) : _behaviorsDisplayed = behaviorsDisplayed,
        _selfHarmTypes = selfHarmTypes,
-       _secondSupportNeeded = secondSupportNeeded;
+       _secondSupportNeeded = secondSupportNeeded,
+       super._();
 
   factory _$BehaviorIncidentImpl.fromJson(Map<String, dynamic> json) =>
       _$$BehaviorIncidentImplFromJson(json);
@@ -340,10 +326,9 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
   @override
   @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
   final BehaviorSeverity severity;
-  @override
-  @JsonKey(name: 'self_harm', fromJson: _boolFromJson)
-  final bool selfHarm;
+  // Note: self_harm boolean removed - derived from self_harm_types/count
   final List<String> _selfHarmTypes;
+  // Note: self_harm boolean removed - derived from self_harm_types/count
   @override
   @JsonKey(name: 'self_harm_types')
   List<String> get selfHarmTypes {
@@ -379,7 +364,7 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
 
   @override
   String toString() {
-    return 'BehaviorIncident(id: $id, convexId: $convexId, behaviorsDisplayed: $behaviorsDisplayed, duration: $duration, severity: $severity, selfHarm: $selfHarm, selfHarmTypes: $selfHarmTypes, selfHarmCount: $selfHarmCount, initialIntervention: $initialIntervention, interventionDescription: $interventionDescription, secondSupportNeeded: $secondSupportNeeded, secondSupportDescription: $secondSupportDescription, description: $description)';
+    return 'BehaviorIncident(id: $id, convexId: $convexId, behaviorsDisplayed: $behaviorsDisplayed, duration: $duration, severity: $severity, selfHarmTypes: $selfHarmTypes, selfHarmCount: $selfHarmCount, initialIntervention: $initialIntervention, interventionDescription: $interventionDescription, secondSupportNeeded: $secondSupportNeeded, secondSupportDescription: $secondSupportDescription, description: $description)';
   }
 
   @override
@@ -398,8 +383,6 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
                 other.duration == duration) &&
             (identical(other.severity, severity) ||
                 other.severity == severity) &&
-            (identical(other.selfHarm, selfHarm) ||
-                other.selfHarm == selfHarm) &&
             const DeepCollectionEquality().equals(
               other._selfHarmTypes,
               _selfHarmTypes,
@@ -435,7 +418,6 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
     const DeepCollectionEquality().hash(_behaviorsDisplayed),
     duration,
     severity,
-    selfHarm,
     const DeepCollectionEquality().hash(_selfHarmTypes),
     selfHarmCount,
     initialIntervention,
@@ -462,7 +444,7 @@ class _$BehaviorIncidentImpl implements _BehaviorIncident {
   }
 }
 
-abstract class _BehaviorIncident implements BehaviorIncident {
+abstract class _BehaviorIncident extends BehaviorIncident {
   const factory _BehaviorIncident({
     required final String id,
     @JsonKey(name: 'convex_id') final String? convexId,
@@ -471,8 +453,6 @@ abstract class _BehaviorIncident implements BehaviorIncident {
     required final String duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
     required final BehaviorSeverity severity,
-    @JsonKey(name: 'self_harm', fromJson: _boolFromJson)
-    required final bool selfHarm,
     @JsonKey(name: 'self_harm_types') final List<String> selfHarmTypes,
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt)
     final int selfHarmCount,
@@ -486,6 +466,7 @@ abstract class _BehaviorIncident implements BehaviorIncident {
     final String? secondSupportDescription,
     required final String description,
   }) = _$BehaviorIncidentImpl;
+  const _BehaviorIncident._() : super._();
 
   factory _BehaviorIncident.fromJson(Map<String, dynamic> json) =
       _$BehaviorIncidentImpl.fromJson;
@@ -502,10 +483,7 @@ abstract class _BehaviorIncident implements BehaviorIncident {
   String get duration;
   @override
   @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson)
-  BehaviorSeverity get severity;
-  @override
-  @JsonKey(name: 'self_harm', fromJson: _boolFromJson)
-  bool get selfHarm;
+  BehaviorSeverity get severity; // Note: self_harm boolean removed - derived from self_harm_types/count
   @override
   @JsonKey(name: 'self_harm_types')
   List<String> get selfHarmTypes;

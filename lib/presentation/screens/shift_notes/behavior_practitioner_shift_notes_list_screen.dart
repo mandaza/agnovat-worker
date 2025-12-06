@@ -275,7 +275,8 @@ class _BehaviorPractitionerShiftNotesListScreenState
             },
           ),
           const SizedBox(height: 12),
-          // Status filters
+          // Status filters - Behavior practitioners only see submitted notes
+          // Draft filter is removed since behavior practitioners should NEVER see drafts
           Row(
             children: [
               _buildStatusChip(
@@ -291,19 +292,7 @@ class _BehaviorPractitionerShiftNotesListScreenState
                 },
               ),
               const SizedBox(width: 8),
-              _buildStatusChip(
-                context: context,
-                ref: ref,
-                label: 'Draft',
-                count: state.shiftNotes.where((n) => n.isDraft).length,
-                isSelected: state.statusFilter == BehaviorPractitionerShiftNoteFilter.draft,
-                onTap: () {
-                  ref
-                      .read(behaviorPractitionerShiftNotesProvider.notifier)
-                      .setStatusFilter(BehaviorPractitionerShiftNoteFilter.draft);
-                },
-              ),
-              const SizedBox(width: 8),
+              // Only show "Submitted" filter - drafts are not visible to behavior practitioners
               _buildStatusChip(
                 context: context,
                 ref: ref,

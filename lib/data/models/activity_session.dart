@@ -34,13 +34,15 @@ enum BehaviorSeverity {
 /// Behavior incident within an activity session
 @freezed
 class BehaviorIncident with _$BehaviorIncident {
+  const BehaviorIncident._(); // Required for adding getters
+
   const factory BehaviorIncident({
     required String id, // Local ID for the incident (UUID)
     @JsonKey(name: 'convex_id') String? convexId, // Convex database ID (for reviews)
     @JsonKey(name: 'behaviors_displayed') required List<String> behaviorsDisplayed,
     required String duration,
     @JsonKey(fromJson: _severityFromJson, toJson: _severityToJson) required BehaviorSeverity severity,
-    @JsonKey(name: 'self_harm', fromJson: _boolFromJson) required bool selfHarm,
+    // Note: self_harm boolean removed - derived from self_harm_types/count
     @JsonKey(name: 'self_harm_types') @Default([]) List<String> selfHarmTypes,
     @JsonKey(name: 'self_harm_count', fromJson: _selfHarmCountToInt) @Default(0) int selfHarmCount,
     @JsonKey(name: 'initial_intervention') required String initialIntervention,
@@ -49,6 +51,16 @@ class BehaviorIncident with _$BehaviorIncident {
     @JsonKey(name: 'second_support_description') String? secondSupportDescription,
     required String description,
   }) = _BehaviorIncident;
+
+  /// Computed property: self_harm is true if there are self-harm types (excluding 'no_harm') or count > 0
+  bool get selfHarm {
+    return selfHarmTypes.isNotEmpty &&
+           !selfHarmTypes.every((type) =>
+             type.toString().toLowerCase() == 'no_harm' ||
+             type.toString() == 'No Harm'
+           ) ||
+           selfHarmCount > 0;
+  }
 
   factory BehaviorIncident.fromJson(Map<String, dynamic> json) =>
       _$BehaviorIncidentFromJson(json);
@@ -61,17 +73,6 @@ int _selfHarmCountToInt(dynamic value) {
   if (value is double) return value.round();
   if (value is String) return int.tryParse(value) ?? 0;
   return 0;
-}
-
-/// Helper to convert nullable bool to bool (defaults to false if null)
-bool _boolFromJson(dynamic value) {
-  if (value == null) return false;
-  if (value is bool) return value;
-  if (value is String) {
-    return value.toLowerCase() == 'true' || value == '1';
-  }
-  if (value is int) return value != 0;
-  return false;
 }
 
 /// Helper functions for BehaviorSeverity JSON conversion

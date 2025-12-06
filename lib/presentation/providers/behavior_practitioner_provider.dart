@@ -89,9 +89,10 @@ class BehaviorPractitionerNotifier extends AutoDisposeNotifier<BehaviorPractitio
 
       print('🔍 Behavior Practitioner: Fetching shift notes...');
       
-      // Fetch only recent submitted shift notes for faster initial load
+      // Fetch all submitted shift notes (behavior practitioners need to see all submitted notes)
+      // Use a higher limit to get more shift notes
       final shiftNotesJson = await apiService.listShiftNotes(
-        limit: 50, // Increased to get more incidents
+        limit: 200, // Increased significantly to get all submitted shift notes
       );
 
       print('📋 Found ${shiftNotesJson.length} shift notes');
@@ -114,8 +115,9 @@ class BehaviorPractitionerNotifier extends AutoDisposeNotifier<BehaviorPractitio
 
       print('✅ Found ${shiftNotes.length} submitted shift notes');
 
-      // Process more shift notes to get more incidents
-      final notesToProcess = shiftNotes.take(20).toList(); // Increased from 10 to 20
+      // Process ALL submitted shift notes (not just the first 20)
+      // This ensures behavior practitioners see all submitted shift notes with incidents
+      final notesToProcess = shiftNotes; // Process all submitted notes
       
       print('🔄 Processing ${notesToProcess.length} shift notes...');
       
@@ -254,11 +256,11 @@ class BehaviorPractitionerNotifier extends AutoDisposeNotifier<BehaviorPractitio
                       try {
                         // Create a safe incident with defaults for null values
                         final safeIncidentJson = Map<String, dynamic>.from(incidentJson);
-                        safeIncidentJson['self_harm'] ??= false;
+                        // self_harm removed - now a computed property derived from self_harm_types/count
                         safeIncidentJson['self_harm_types'] ??= [];
                         safeIncidentJson['self_harm_count'] ??= 0;
                         safeIncidentJson['second_support_needed'] ??= [];
-                        
+
                         final incident = BehaviorIncident.fromJson(safeIncidentJson);
                         print('      ✅ Manually parsed incident: ${incident.id}');
                         

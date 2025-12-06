@@ -28,6 +28,18 @@ class BehaviorPractitionerDashboardScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final dashboardState = ref.watch(behaviorPractitionerProvider);
 
+    // If user is logged out or logging out, return to login immediately.
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
     // Show loading while initializing auth
     if (authState.isLoading) {
       return const Scaffold(

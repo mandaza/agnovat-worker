@@ -13,6 +13,7 @@ import '../../../data/models/goal.dart';
 import '../../../data/services/media_upload_service.dart';
 import '../../providers/shift_notes_provider.dart';
 import '../../providers/shift_note_detail_provider.dart';
+import '../../providers/auth_provider.dart';
 import 'unified_shift_note_wizard.dart';
 
 /// Shift Note Details Screen
@@ -2646,11 +2647,26 @@ class ShiftNoteDetailsScreen extends ConsumerWidget {
   }
 
   void _editNote(BuildContext context, WidgetRef ref, ShiftNote shiftNote) {
+    // Get current user to verify ownership
+    final authState = ref.read(authProvider);
+    final currentUserId = authState.user?.id;
+
     // Only allow editing draft notes
     if (!shiftNote.isDraft) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Submitted shift notes cannot be edited'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // Verify ownership - only the creator can edit their draft
+    if (currentUserId == null || shiftNote.userId != currentUserId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can only edit your own draft shift notes'),
           backgroundColor: AppColors.error,
         ),
       );

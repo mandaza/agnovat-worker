@@ -16,7 +16,6 @@ _$BehaviorIncidentImpl _$$BehaviorIncidentImplFromJson(
       .toList(),
   duration: json['duration'] as String,
   severity: _severityFromJson(json['severity'] as String),
-  selfHarm: _boolFromJson(json['self_harm']),
   selfHarmTypes:
       (json['self_harm_types'] as List<dynamic>?)
           ?.map((e) => e as String)
@@ -44,7 +43,6 @@ Map<String, dynamic> _$$BehaviorIncidentImplToJson(
   'behaviors_displayed': instance.behaviorsDisplayed,
   'duration': instance.duration,
   'severity': _severityToJson(instance.severity),
-  'self_harm': instance.selfHarm,
   'self_harm_types': instance.selfHarmTypes,
   'self_harm_count': instance.selfHarmCount,
   'initial_intervention': instance.initialIntervention,

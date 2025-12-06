@@ -5,6 +5,7 @@ import 'package:clerk_flutter/clerk_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/providers/service_providers.dart';
+import '../../providers/auth_provider.dart';
 import '../../widgets/common/app_logo.dart';
 
 /// Custom sign-in screen using Clerk authentication
@@ -56,8 +57,47 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         password: _passwordController.text,
       );
 
-      // Step 2: After successful Clerk login, get user info and save clerk_id
-      await _syncUserToConvex();
+      // Step 2: IMMEDIATELY save user data to SharedPreferences
+      // This must happen BEFORE ClerkAuthBuilder switches to signed-in state
+      // Get Clerk user right after sign-in
+      final clerkAuth = ClerkAuth.of(context);
+      final clerkUser = clerkAuth.user;
+
+      if (clerkUser != null) {
+        // Save user data IMMEDIATELY (synchronously if possible)
+        final prefs = await SharedPreferences.getInstance();
+        final email = clerkUser.email?.isNotEmpty == true ? clerkUser.email! : 'user@agnovat.com';
+        final name = clerkUser.name?.isNotEmpty == true ? clerkUser.name! : 'User';
+        final imageUrl = clerkUser.imageUrl;
+
+        // Save to SharedPreferences IMMEDIATELY
+        await prefs.setString('clerk_user_id', clerkUser.id);
+        await prefs.setString('clerk_user_name', name);
+        await prefs.setString('clerk_user_email', email);
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          await prefs.setString('clerk_user_image_url', imageUrl);
+        } else {
+          await prefs.remove('clerk_user_image_url');
+        }
+
+        debugPrint('✅ Sign In: IMMEDIATELY saved clerk_user_id: ${clerkUser.id}');
+
+        // Force a small delay to ensure SharedPreferences is committed
+        await Future.delayed(const Duration(milliseconds: 100));
+
+        // IMPORTANT: Reset logout flag AFTER data is saved
+        // This allows authProvider to load the profile now that data exists
+        ref.read(authProvider.notifier).resetLogoutFlag();
+        debugPrint('✅ Sign In: Logout flag reset - auth provider can now load profile');
+      }
+
+      // Step 3: Now sync to Convex in the background (non-blocking)
+      // This can happen after navigation, but user data is already saved
+      if (mounted) {
+        _syncUserToConvex().catchError((e) {
+          debugPrint('⚠️  Background Convex sync failed: $e');
+        });
+      }
 
       // ClerkAuthBuilder will rebuild to signed-in state
     } on clerk.AuthError catch (e) {
@@ -69,34 +109,33 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
     }
   }
 
-  /// Sync user from Clerk to Convex and save clerk_id locally
-  /// This follows the stateless authentication architecture
+  /// Sync user from Clerk to Convex (background task)
+  /// Note: User data is already saved to SharedPreferences in _handleEmailSignIn()
+  /// This function only handles the Convex sync
   Future<void> _syncUserToConvex() async {
     try {
+      // Check if widget is still mounted before accessing context/ref
+      if (!mounted) {
+        debugPrint('⚠️  Sign In: Widget unmounted, skipping Convex sync');
+        return;
+      }
+
       // Get Clerk user from ClerkAuth
       final clerkAuth = ClerkAuth.of(context);
       final clerkUser = clerkAuth.user;
 
       if (clerkUser == null) {
-        throw Exception('Clerk user not found after sign-in');
+        debugPrint('⚠️  Sign In: Clerk user not found for Convex sync');
+        return;
       }
 
       // Extract user info from Clerk user object
-      // Note: Clerk Flutter SDK user properties may vary
-      final email = clerkUser.email ?? 'user@agnovat.com';
-      final name = clerkUser.name;
+      final email = clerkUser.email?.isNotEmpty == true ? clerkUser.email! : 'user@agnovat.com';
+      final name = clerkUser.name?.isNotEmpty == true ? clerkUser.name! : 'User';
       final imageUrl = clerkUser.imageUrl;
 
-      // Save user data to SharedPreferences (for immediate display)
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('clerk_user_id', clerkUser.id);
-      await prefs.setString('clerk_user_name', name);
-      await prefs.setString('clerk_user_email', email);
-      if (imageUrl != null) {
-        await prefs.setString('clerk_user_image_url', imageUrl);
-      }
-
       // Sync user to Convex (create/update user in Convex database)
+      // This is non-blocking - if it fails, user can still proceed with cached data
       final apiService = ref.read(mcpApiServiceProvider);
       
       await apiService.syncUserFromClerk(
@@ -108,9 +147,11 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       // Update last login timestamp
       await apiService.updateLastLogin(clerkUser.id);
+      debugPrint('✅ Sign In: Successfully synced user to Convex');
     } catch (e) {
-      // Log error but don't block login - user can still proceed
-      debugPrint('Failed to sync user to Convex: $e');
+      // Log Convex sync error but don't block login
+      debugPrint('⚠️  Sign In: Failed to sync user to Convex: $e');
+      debugPrint('   User can still proceed with cached Clerk data');
     }
   }
 

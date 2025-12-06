@@ -33,7 +33,6 @@ class UnifiedShiftNoteWizard extends ConsumerStatefulWidget {
 
 class _UnifiedShiftNoteWizardState
     extends ConsumerState<UnifiedShiftNoteWizard> {
-  final _uuid = const Uuid();
 
   // Stepper control
   int _currentStep = 0;
@@ -57,10 +56,6 @@ class _UnifiedShiftNoteWizardState
     super.initState();
     // Pre-fill form if editing, otherwise set default client
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Pre-load clients immediately for seamless selection
-      // This ensures clients are loading in the background even if not yet available
-      ref.read(clientsListCachedProvider.notifier);
-      
       if (widget.shiftNote != null) {
         // Check if trying to edit a submitted note
         if (!widget.shiftNote!.isDraft) {
@@ -79,15 +74,6 @@ class _UnifiedShiftNoteWizardState
           return;
         }
         _preFillFormData(widget.shiftNote!);
-      } else {
-        // Use cached clients provider for instant loading
-        final clientsState = ref.read(clientsListCachedProvider);
-        if (clientsState.clients.isNotEmpty && _selectedClientId == null) {
-          setState(() {
-            _selectedClientId = clientsState.clients.first.id;
-            _selectedClientName = clientsState.clients.first.name;
-          });
-        }
       }
     });
   }
@@ -96,10 +82,18 @@ class _UnifiedShiftNoteWizardState
   void _preFillFormData(ShiftNote shiftNote) async {
     // Get client name using cached clients for instant access
     String clientName = 'Unknown Client';
+    
+    // Wait for clients to load if they're not ready yet
+    final clientsState = ref.read(clientsListCachedProvider);
+    if (clientsState.isLoading) {
+      // Wait a bit for clients to load
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+    
     try {
-      final clientsState = ref.read(clientsListCachedProvider);
+      final updatedClientsState = ref.read(clientsListCachedProvider);
       try {
-        final client = clientsState.clients.firstWhere(
+        final client = updatedClientsState.clients.firstWhere(
           (c) => c.id == shiftNote.clientId,
         );
         clientName = client.name;
@@ -200,6 +194,24 @@ class _UnifiedShiftNoteWizardState
 
   @override
   Widget build(BuildContext context) {
+    // Watch clients provider to ensure data is loaded and up-to-date
+    final clientsState = ref.watch(clientsListCachedProvider);
+    
+    // Auto-select first client if none selected and clients are available
+    if (widget.shiftNote == null && 
+        _selectedClientId == null && 
+        clientsState.clients.isNotEmpty && 
+        !clientsState.isLoading) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          setState(() {
+            _selectedClientId = clientsState.clients.first.id;
+            _selectedClientName = clientsState.clients.first.name;
+          });
+        }
+      });
+    }
+
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
       appBar: _buildAppBar(),
@@ -212,7 +224,7 @@ class _UnifiedShiftNoteWizardState
         steps: [
           Step(
             title: const Text('Shift Details'),
-            content: _buildStep1ShiftDetails(),
+            content: _buildStep1ShiftDetails(clientsState),
             isActive: _currentStep >= 0,
             state: _currentStep > 0 ? StepState.complete : StepState.indexed,
           ),
@@ -263,11 +275,7 @@ class _UnifiedShiftNoteWizardState
   }
 
   // ==================== STEP 1: SHIFT DETAILS ====================
-  Widget _buildStep1ShiftDetails() {
-    // Watch cached clients provider to trigger loading and ensure data is available
-    // The provider will start loading automatically when first watched
-    ref.watch(clientsListCachedProvider);
-
+  Widget _buildStep1ShiftDetails(ClientsListState clientsState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -284,7 +292,7 @@ class _UnifiedShiftNoteWizardState
         _buildSectionLabel('Client'),
         const SizedBox(height: 8),
         InkWell(
-          onTap: widget.shiftNote != null ? null : () => _showClientSelector(),
+          onTap: widget.shiftNote != null ? null : () => _showClientSelector(clientsState),
           borderRadius: BorderRadius.circular(16),
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -302,19 +310,44 @@ class _UnifiedShiftNoteWizardState
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  _selectedClientName ?? 'Select client',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: widget.shiftNote != null
-                        ? AppColors.textSecondary
-                        : (_selectedClientName != null
-                            ? AppColors.textPrimary
-                            : AppColors.textSecondary),
+                // Show loading state while clients are loading
+                if (clientsState.isLoading && _selectedClientName == null && widget.shiftNote == null)
+                  Row(
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Text(
+                        'Loading clients...',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  )
+                else
+                  Text(
+                    _selectedClientName ?? 'Select client',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: widget.shiftNote != null
+                          ? AppColors.textSecondary
+                          : (_selectedClientName != null
+                              ? AppColors.textPrimary
+                              : AppColors.textSecondary),
+                    ),
                   ),
-                ),
                 if (widget.shiftNote != null)
                   const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary)
+                else if (clientsState.isLoading && _selectedClientName == null)
+                  const SizedBox.shrink()
                 else
                   const Icon(Icons.keyboard_arrow_down, size: 20),
               ],
@@ -746,25 +779,20 @@ class _UnifiedShiftNoteWizardState
     );
   }
 
-  void _showClientSelector() {
+  void _showClientSelector(ClientsListState clientsState) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Consumer(
-        builder: (context, ref, _) {
-          // Watch the clients provider directly inside the modal
-          final clientsState = ref.watch(clientsListCachedProvider);
-          final clients = clientsState.clients;
-          final isLoading = clientsState.isLoading;
-          final error = clientsState.error;
-
-          return Container(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
                   'Select Client',
@@ -774,74 +802,111 @@ class _UnifiedShiftNoteWizardState
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 16),
-                // Show loading state
-                if (isLoading)
-                  const Padding(
-                    padding: EdgeInsets.all(24.0),
-                    child: Center(
-                      child: CircularProgressIndicator(),
+                if (clientsState.isLoading)
+                  SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
                     ),
-                  )
-                // Show error state
-                else if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.all(24.0),
-                    child: Column(
-                      children: [
-                        Text(
-                          'Error loading clients: $error',
-                          style: const TextStyle(
-                            color: AppColors.error,
-                          ),
-                        ),
-                        const SizedBox(height: 16),
-                        ElevatedButton(
-                          onPressed: () {
-                            ref.read(clientsListCachedProvider.notifier).refresh();
-                          },
-                          child: const Text('Retry'),
-                        ),
-                      ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Show error state
+            if (clientsState.error != null)
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  children: [
+                    Text(
+                      'Error loading clients: ${clientsState.error}',
+                      style: const TextStyle(
+                        color: AppColors.error,
+                      ),
                     ),
-                  )
-                // Show empty state
-                else if (clients.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(24.0),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        ref.read(clientsListCachedProvider.notifier).refresh();
+                      },
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+            // Show empty state
+            else if (clientsState.clients.isEmpty && !clientsState.isLoading)
+              const Padding(
+                padding: EdgeInsets.all(24.0),
+                child: Center(
+                  child: Text(
+                    'No clients available',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              )
+            // Show clients list
+            else
+              ...clientsState.clients.map((client) {
+                final isSelected = _selectedClientId == client.id;
+                return ListTile(
+                  leading: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [AppColors.deepBrown, AppColors.burntOrange],
+                      ),
+                      shape: BoxShape.circle,
+                    ),
                     child: Center(
                       child: Text(
-                        'No clients available',
-                        style: TextStyle(
-                          color: AppColors.textSecondary,
+                        _getInitials(client.name),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
-                  )
-                // Show clients list
-                else
-                  ...clients.map((client) {
-                    final isSelected = _selectedClientId == client.id;
-                    return ListTile(
-                      title: Text(client.name),
-                      trailing: isSelected
-                          ? const Icon(Icons.check, color: AppColors.primary)
-                          : null,
-                      onTap: () {
-                        setState(() {
-                          _selectedClientId = client.id;
-                          _selectedClientName = client.name;
-                        });
-                        Navigator.pop(context);
-                      },
-                    );
-                  }),
-              ],
-            ),
-          );
-        },
+                  ),
+                  title: Text(
+                    client.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text('Age: ${client.age} years'),
+                  trailing: isSelected
+                      ? const Icon(Icons.check, color: AppColors.primary)
+                      : null,
+                  onTap: () {
+                    setState(() {
+                      _selectedClientId = client.id;
+                      _selectedClientName = client.name;
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              }),
+          ],
+        ),
       ),
     );
+  }
+  
+  String _getInitials(String name) {
+    final parts = name.trim().split(' ');
+    if (parts.isEmpty) return '';
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[parts.length - 1][0]}'.toUpperCase();
   }
 
   void _addActivitySession() {
@@ -1164,7 +1229,7 @@ class _UnifiedShiftNoteWizardState
                 'behaviors_displayed': bi.behaviorsDisplayed,
                 'duration': bi.duration,
                 'severity': bi.severity.toJson(),
-                'self_harm': bi.selfHarm,
+                // self_harm removed - derives from self_harm_types/count
                 'self_harm_types': bi.selfHarmTypes,
                 'self_harm_count': bi.selfHarmCount,
                 'initial_intervention': bi.initialIntervention,
@@ -1396,7 +1461,7 @@ class _UnifiedShiftNoteWizardState
                 'behaviors_displayed': bi.behaviorsDisplayed,
                 'duration': bi.duration,
                 'severity': bi.severity.toJson(),
-                'self_harm': bi.selfHarm,
+                // self_harm removed - derives from self_harm_types/count
                 'self_harm_types': bi.selfHarmTypes,
                 'self_harm_count': bi.selfHarmCount,
                 'initial_intervention': bi.initialIntervention,
@@ -3504,7 +3569,7 @@ class _BehaviorIncidentFormScreenState
       behaviorsDisplayed: selectedBehaviors,
       duration: _duration!,
       severity: _severity!,
-      selfHarm: _selfHarm,
+      // selfHarm is now a computed property derived from selfHarmTypes/selfHarmCount
       selfHarmTypes: selfHarmTypes,
       selfHarmCount: _selfHarm ? _harmCount : 0,
       initialIntervention: _initialIntervention!,

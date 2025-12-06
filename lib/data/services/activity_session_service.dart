@@ -41,7 +41,7 @@ class ActivitySessionService {
                     'behaviors_displayed': incident.behaviorsDisplayed,
                     'duration': incident.duration,
                     'severity': incident.severity.name,
-                    'self_harm': incident.selfHarm,
+                    // self_harm removed - derives from self_harm_types/count
                     'self_harm_types': incident.selfHarmTypes,
                     'self_harm_count': incident.selfHarmCount,
                     'initial_intervention': incident.initialIntervention,

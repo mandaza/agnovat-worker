@@ -4,6 +4,7 @@ import 'core/config/app_theme.dart';
 import 'core/config/app_constants.dart';
 import 'presentation/screens/auth/sign_in_screen.dart';
 import 'presentation/screens/dashboard/dashboard_router.dart';
+import 'presentation/widgets/auth_bootstrapper.dart';
 
 /// Root application widget
 class AgnovatApp extends StatelessWidget {
@@ -25,7 +26,9 @@ class AgnovatApp extends StatelessWidget {
         child: ClerkAuthBuilder(
           // When user is signed in - route to role-based dashboard
           signedInBuilder: (context, authState) {
-            return const DashboardRouter();
+            return const AuthBootstrapper(
+              child: DashboardRouter(),
+            );
           },
           // When user is signed out - show custom sign-in screen
           signedOutBuilder: (context, authState) {

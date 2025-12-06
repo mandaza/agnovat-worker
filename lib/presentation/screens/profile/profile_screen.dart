@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:clerk_flutter/clerk_flutter.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/user.dart';
 import '../../providers/auth_provider.dart';
+import '../../utils/logout_helper.dart';
 
 /// Profile Screen
 /// Displays user information, settings, and account options
@@ -14,6 +14,20 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
     final user = authState.user;
+
+    // If not authenticated (e.g., just logged out), immediately return to root/login.
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
+        }
+      });
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     // Show loading state
     if (authState.isLoading) {
@@ -549,7 +563,7 @@ class ProfileScreen extends ConsumerWidget {
                 final confirmed = await _showSignOutDialog(context);
                 if (confirmed == true && context.mounted) {
                   // Sign out using Clerk
-                  await _handleSignOut(context);
+                  await _handleSignOut(context, ref);
                 }
               },
         style: OutlinedButton.styleFrom(
@@ -581,29 +595,8 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   /// Handle sign out with Clerk
-  Future<void> _handleSignOut(BuildContext context) async {
-    try {
-      // Get the Clerk auth from the widget tree
-      final clerkAuth = ClerkAuth.of(context);
-      
-      // Sign out from Clerk
-      await clerkAuth.signOut();
-      
-      // Pop all routes to go back to root - ClerkAuthBuilder will show sign-in screen
-      if (context.mounted) {
-        Navigator.of(context).popUntil((route) => route.isFirst);
-      }
-    } catch (e) {
-      // Show error message
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Sign out failed: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
+  Future<void> _handleSignOut(BuildContext context, WidgetRef ref) async {
+    await performLogout(context, ref);
   }
 
   /// Section Title

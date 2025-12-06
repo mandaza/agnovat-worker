@@ -133,6 +133,11 @@ class AppDatabase extends _$AppDatabase {
     return result.read(localDraftSessions.id.count()) ?? 0;
   }
 
+  /// Clear all draft sessions (used on sign-out to prevent data leakage)
+  Future<int> clearAllDrafts() async {
+    return delete(localDraftSessions).go();
+  }
+
   /// Convert database row to DraftActivitySession model
   DraftActivitySession _draftFromRow(LocalDraftSession row) {
     try {
