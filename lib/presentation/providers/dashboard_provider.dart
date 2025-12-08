@@ -4,6 +4,7 @@ import '../../core/providers/service_providers.dart';
 import '../../data/services/mcp_api_service.dart';
 import '../../data/models/client.dart';
 import '../../data/models/activity.dart';
+import 'auth_provider.dart';
 
 /// Dashboard state model
 class DashboardState {
@@ -52,6 +53,12 @@ class DashboardNotifier extends AutoDisposeNotifier<DashboardState> {
 
   @override
   DashboardState build() {
+    // If auth is not ready, skip creating timers/fetching.
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      return const DashboardState(isLoading: false);
+    }
+
     // Set up auto-refresh (every 30 seconds for real-time data)
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       _fetchData();
@@ -70,6 +77,14 @@ class DashboardNotifier extends AutoDisposeNotifier<DashboardState> {
 
   /// Fetch dashboard data from Convex
   Future<void> _fetchData() async {
+    // Prevent requests when user is logged out or logging out.
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      _refreshTimer?.cancel();
+      state = const DashboardState(isLoading: false, error: null, assignedClients: [], todaysActivities: []);
+      return;
+    }
+
     try {
       final apiService = ref.read(mcpApiServiceProvider);
       
@@ -128,17 +143,32 @@ final dashboardProvider = AutoDisposeNotifierProvider<DashboardNotifier, Dashboa
 /// Dashboard data provider with auto-refresh (kept for backward compatibility)
 /// Fetches real-time dashboard data from Convex
 final dashboardDataProvider = StreamProvider.autoDispose<DashboardData>((ref) {
+  final authState = ref.watch(authProvider);
   final apiService = ref.watch(mcpApiServiceProvider);
-  
+
   // Create a stream controller for dashboard updates
   final controller = StreamController<DashboardData>();
-  
+
+  // Don't fetch if not authenticated or logging out
+  if (!authState.isAuthenticated || authState.isLoggingOut) {
+    ref.onDispose(() {
+      controller.close();
+    });
+    return controller.stream;
+  }
+
   // Auto-refresh interval (every 30 seconds)
   const refreshInterval = Duration(seconds: 30);
   Timer? timer;
-  
+
   // Fetch data immediately
   void fetchData() async {
+    // Double-check auth state before each fetch
+    final currentAuth = ref.read(authProvider);
+    if (!currentAuth.isAuthenticated || currentAuth.isLoggingOut) {
+      return;
+    }
+
     try {
       final data = await apiService.getDashboard();
       if (!controller.isClosed) {
@@ -150,21 +180,21 @@ final dashboardDataProvider = StreamProvider.autoDispose<DashboardData>((ref) {
       }
     }
   }
-  
+
   // Initial fetch
   fetchData();
-  
+
   // Set up periodic refresh
   timer = Timer.periodic(refreshInterval, (_) {
     fetchData();
   });
-  
+
   // Clean up when provider is disposed
   ref.onDispose(() {
     timer?.cancel();
     controller.close();
   });
-  
+
   return controller.stream;
 });
 

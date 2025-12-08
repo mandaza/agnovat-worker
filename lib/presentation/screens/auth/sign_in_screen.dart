@@ -85,10 +85,8 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
         // Force a small delay to ensure SharedPreferences is committed
         await Future.delayed(const Duration(milliseconds: 100));
 
-        // IMPORTANT: Reset logout flag AFTER data is saved
-        // This allows authProvider to load the profile now that data exists
-        ref.read(authProvider.notifier).resetLogoutFlag();
-        debugPrint('✅ Sign In: Logout flag reset - auth provider can now load profile');
+        // Profile loading is now triggered by _SignedInShell upon authentication.
+        // No explicit action needed here.
       }
 
       // Step 3: Now sync to Convex in the background (non-blocking)
@@ -101,8 +99,10 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
 
       // ClerkAuthBuilder will rebuild to signed-in state
     } on clerk.AuthError catch (e) {
+      if (!mounted) return;
       _showError(e.message);
     } catch (e) {
+      if (!mounted) return;
       _showError('Sign in failed: $e');
     } finally {
       if (mounted) setState(() => _loading = false);

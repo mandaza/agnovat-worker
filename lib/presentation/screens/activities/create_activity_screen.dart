@@ -121,12 +121,12 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
       final apiService = ref.read(mcpApiServiceProvider);
       final authState = ref.read(authProvider);
 
-      // Use user's stakeholderId if they have one, otherwise null
+      // Use user's stakeholderId if they have one, otherwise send null
       final stakeholderId = authState.user?.stakeholderId;
 
       await apiService.createActivity(
         clientId: _selectedClientId!,
-        stakeholderId: stakeholderId ?? '', // Send empty string if null
+        stakeholderId: stakeholderId, // Can be null for guardians
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
             ? null

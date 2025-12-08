@@ -112,6 +112,11 @@ class BehaviorIncidentReviewsNotifier extends AutoDisposeNotifier<BehaviorIncide
 
   @override
   BehaviorIncidentReviewsState build() {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      return const BehaviorIncidentReviewsState(isLoading: false, reviews: []);
+    }
+
     // Set up auto-refresh (every 60 seconds)
     _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
       _fetchReviews();
@@ -130,12 +135,17 @@ class BehaviorIncidentReviewsNotifier extends AutoDisposeNotifier<BehaviorIncide
 
   /// Fetch behavior incident reviews from Convex
   Future<void> _fetchReviews({bool fetchAll = false}) async {
+    final authState = ref.read(authProvider);
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      _refreshTimer?.cancel();
+      state = const BehaviorIncidentReviewsState(isLoading: false, reviews: []);
+      return;
+    }
+
     try {
       // Get service
       final service = ref.read(behaviorIncidentReviewsServiceProvider);
-
       // Get current user's Clerk ID and role for filtering
-      final authState = ref.read(authProvider);
       final clerkId = authState.user?.clerkId;
       final userRole = authState.user?.role;
 
@@ -324,13 +334,19 @@ final behaviorIncidentReviewsProvider = AutoDisposeNotifierProvider<BehaviorInci
 /// Provider for unacknowledged reviews (notifications for support workers)
 /// Now uses Clerk ID instead of Convex user ID
 final unacknowledgedReviewsProvider = FutureProvider.autoDispose<List<BehaviorIncidentReview>>((ref) async {
-  final service = ref.watch(behaviorIncidentReviewsServiceProvider);
   final authState = ref.watch(authProvider);
-  final clerkId = authState.user?.clerkId;
 
+  // Don't fetch if not authenticated or logging out
+  if (!authState.isAuthenticated || authState.isLoggingOut) {
+    return [];
+  }
+
+  final clerkId = authState.user?.clerkId;
   if (clerkId == null) {
     return [];
   }
+
+  final service = ref.watch(behaviorIncidentReviewsServiceProvider);
 
   try {
     return await service.getUnacknowledgedForUser(clerkId);

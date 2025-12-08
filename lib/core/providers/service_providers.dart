@@ -38,8 +38,9 @@ final dashboardRepositoryProvider = Provider<DashboardRepository>((ref) {
 
 /// App Database Provider (Drift)
 /// Provides access to local SQLite database for offline storage
+final _appDatabase = AppDatabase();
 final appDatabaseProvider = Provider<AppDatabase>((ref) {
-  return AppDatabase();
+  return _appDatabase;
 });
 
 /// Activity Session Service Provider

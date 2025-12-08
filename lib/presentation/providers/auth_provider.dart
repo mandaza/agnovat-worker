@@ -40,22 +40,10 @@ class AuthState {
 /// Auth state notifier that syncs with Clerk authentication
 class AuthNotifier extends Notifier<AuthState> {
   Timer? _backgroundRetryTimer; // Keep track of background retry timer
-  static bool _isLoggingOut = false; // Static flag that persists across rebuilds
 
   @override
   AuthState build() {
-    // Schedule user profile loading AFTER build completes
-    // This prevents "uninitialized provider" error
-    // BUT: Don't load profile if we're in the middle of logging out
-    Future.microtask(() {
-      // Check static logout flag before trying to load profile
-      if (!_isLoggingOut) {
-        _loadUserProfile();
-      } else {
-        print('🚫 Auth Provider: Skipping profile load - logout in progress');
-      }
-    });
-
+    // This provider is now passive. Profile loading is triggered by the UI.
     return const AuthState();
   }
 
@@ -154,6 +142,7 @@ class AuthNotifier extends Notifier<AuthState> {
       print('   - cached image: ${cachedImageUrl ?? 'NOT FOUND'}');
 
       // Ensure clerkId is not null at this point
+      // ignore: unnecessary_null_comparison
       if (clerkId == null) {
         print('❌ Auth Provider: clerkId is still null after all retries');
         state = state.copyWith(
@@ -298,7 +287,6 @@ class AuthNotifier extends Notifier<AuthState> {
   void forceLogout() {
     print('🚪 Auth Provider: Force logout called');
     _stopBackgroundRetry();
-    _isLoggingOut = true; // Set static flag to prevent profile reload across rebuilds
     state = state.copyWith(
       isLoading: false,
       error: null,
@@ -306,17 +294,6 @@ class AuthNotifier extends Notifier<AuthState> {
       user: null,
       isLoggingOut: true, // Also set instance flag
     );
-  }
-
-  /// Reset logout flag and trigger profile load (called after user data is saved during sign-in)
-  void resetLogoutFlag() {
-    print('🔄 Auth Provider: Resetting logout flag and loading profile');
-    _isLoggingOut = false;
-    state = state.copyWith(
-      isLoggingOut: false,
-    );
-    // Trigger profile load now that logout flag is reset and user data is saved
-    _loadUserProfile();
   }
 
   /// Manually refresh user profile

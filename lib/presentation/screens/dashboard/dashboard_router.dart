@@ -15,8 +15,7 @@ class DashboardRouter extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
 
-    // Show loading while fetching user data
-    // The auth provider will automatically retry in the background
+    // 1) Loading auth
     if (authState.isLoading) {
       return const Scaffold(
         body: Center(
@@ -25,8 +24,7 @@ class DashboardRouter extends ConsumerWidget {
       );
     }
 
-    // Show error if authentication failed (only after all retries are exhausted)
-    // This should rarely happen as auth provider retries in background
+    // 2) Auth error
     if (authState.error != null) {
       return Scaffold(
         body: Center(
@@ -71,34 +69,15 @@ class DashboardRouter extends ConsumerWidget {
       );
     }
 
-    // No user found - check if this is a logout scenario or login issue
-    // If user is not authenticated (logged out), don't try to refresh
-    // If user IS authenticated but user data is null, trigger a refresh
-    if (authState.user == null) {
-      if (!authState.isAuthenticated) {
-        // User is logged out - show a blank screen and let ClerkAuthBuilder switch to SignInScreen
-        // This prevents the refresh loop during logout
-        return const Scaffold(
-          body: Center(
-            child: CircularProgressIndicator(),
-          ),
-        );
-      }
-
-      // User is authenticated but profile data is missing - trigger a refresh
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        ref.read(authProvider.notifier).refresh();
-      });
-
-      // Show loading spinner while refreshing
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
+    // 3) Logged out / logging out: let parent (ClerkAuthBuilder) swap screens
+    if (!authState.isAuthenticated || authState.isLoggingOut) {
+      // Return an empty widget. The parent router is responsible for swapping
+      // this screen with the SignInScreen during logout.
+      return const SizedBox.shrink();
     }
 
-    // Route to appropriate dashboard based on user role
+    // 4) Route to appropriate dashboard based on role
+    // It's now guaranteed by the parent shell that user is not null here.
     return _buildDashboardForRole(authState.user!);
   }
 

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/service_providers.dart';
 import '../../data/models/client.dart';
 import 'dashboard_provider.dart';
+import 'auth_provider.dart';
 
 /// Client details provider with auto-refresh
 /// Fetches real-time client data from Convex
@@ -11,6 +12,11 @@ class ClientDetailsNotifier extends AutoDisposeFamilyAsyncNotifier<Client, Strin
 
   @override
   Future<Client> build(String clientId) async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      throw Exception('Not authenticated');
+    }
+
     // Set up auto-refresh (every 15 seconds)
     _refreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
       refresh();
@@ -25,6 +31,10 @@ class ClientDetailsNotifier extends AutoDisposeFamilyAsyncNotifier<Client, Strin
   }
 
   Future<Client> _fetchClient(String clientId) async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      throw Exception('Not authenticated');
+    }
     final apiService = ref.read(mcpApiServiceProvider);
     return await apiService.getClient(clientId);
   }
@@ -137,6 +147,15 @@ class ClientsListNotifier extends Notifier<ClientsListState> {
 
   @override
   ClientsListState build() {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      return const ClientsListState(
+        clients: [],
+        isLoading: false,
+        hasMore: false,
+      );
+    }
+
     // Set up auto-refresh (every 30 seconds)
     _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
       state = state.copyWith(currentPage: 0, hasMore: true);
@@ -165,8 +184,8 @@ class ClientsListNotifier extends Notifier<ClientsListState> {
       // Dashboard provider not available, continue with normal flow
     }
 
-    // Start fetching immediately (no microtask delay)
-    _fetchClients();
+    // Start fetching after build completes
+    Future.microtask(() => _fetchClients());
 
     // Return initial loading state
     return const ClientsListState(isLoading: true);
@@ -174,6 +193,20 @@ class ClientsListNotifier extends Notifier<ClientsListState> {
 
   /// Fetch clients from API with pagination
   Future<void> _fetchClients({bool silentRefresh = false, bool loadMore = false}) async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      // Stop any pending timers and return safe state
+      _refreshTimer?.cancel();
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        clients: const [],
+        hasMore: false,
+        error: null,
+      );
+      return;
+    }
+
     try {
       if (loadMore) {
         state = state.copyWith(isLoadingMore: true);

@@ -24,18 +24,6 @@ class _CoordinatorDashboardScreenState
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    // If user is logged out or logging out, return to login immediately.
-    if (!authState.isAuthenticated || authState.isLoggingOut) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
     if (user == null) {
       return const Scaffold(
         body: Center(child: Text('No user found')),

@@ -5,6 +5,7 @@ import '../../../data/models/activity_session.dart';
 import '../../../data/models/activity_session_enums.dart';
 import '../../../core/providers/service_providers.dart';
 import '../../../data/services/providers.dart';
+import 'auth_provider.dart';
 
 /// Behavior incident with context (shift note and session info)
 class BehaviorIncidentWithContext {
@@ -74,8 +75,13 @@ final behaviorPractitionerProvider =
 class BehaviorPractitionerNotifier extends AutoDisposeNotifier<BehaviorPractitionerState> {
   @override
   BehaviorPractitionerState build() {
-    // Schedule fetch after initialization to avoid accessing state before it's ready
-    Future.microtask(() => _fetchData());
+    final auth = ref.watch(authProvider);
+
+    // Only fetch data if authenticated.
+    if (auth.isAuthenticated && !auth.isLoggingOut) {
+      Future.microtask(() => _fetchData());
+    }
+    
     return const BehaviorPractitionerState();
   }
 

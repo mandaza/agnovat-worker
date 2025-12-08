@@ -69,15 +69,7 @@ class _AuthBootstrapperState extends ConsumerState<AuthBootstrapper> {
       }
     }
 
-    final authNotifier = ref.read(authProvider.notifier);
-    // Clear any lingering logout flag and trigger a profile load if needed.
-    authNotifier.resetLogoutFlag();
-
-    final authStateAfter = ref.read(authProvider);
-    if (!authStateAfter.isAuthenticated || authStateAfter.user == null) {
-      authNotifier.refresh();
-    }
-
+    // Local data is now up-to-date. The _SignedInShell will trigger profile load.
     _synced = true;
   }
 

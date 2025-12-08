@@ -316,7 +316,7 @@ class McpApiService {
   /// Calls Convex function: activities:create
   Future<Activity> createActivity({
     required String clientId,
-    required String stakeholderId,
+    String? stakeholderId,
     required String title,
     String? description,
     required ActivityType activityType,
@@ -326,7 +326,7 @@ class McpApiService {
   }) async {
     final args = {
       'client_id': clientId,
-      'stakeholder_id': stakeholderId,
+      if (stakeholderId != null) 'stakeholder_id': stakeholderId,
       'title': title,
       if (description != null) 'description': description,
       'activity_type': activityType.name,

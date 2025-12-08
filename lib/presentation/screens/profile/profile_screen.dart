@@ -15,20 +15,6 @@ class ProfileScreen extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final user = authState.user;
 
-    // If not authenticated (e.g., just logged out), immediately return to root/login.
-    if (!authState.isAuthenticated || authState.isLoggingOut) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
     // Show loading state
     if (authState.isLoading) {
       return Scaffold(
