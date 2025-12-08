@@ -203,6 +203,45 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
 
               const SizedBox(height: 32),
 
+              // Recent Activity Sessions Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          'Recent Activity Sessions',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            // TODO: Navigate to all activity sessions
+                          },
+                          child: const Text(
+                            'View All',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.deepBrown,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _buildRecentActivitySessions(data),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 32),
+
               // Recent Activity Section
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -627,6 +666,188 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
           child: _buildActivityCard(activity),
         );
       }).toList(),
+    );
+  }
+
+  /// Build recent activity sessions
+  Widget _buildRecentActivitySessions(GuardianDashboardData data) {
+    if (data.recentActivitySessions.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(32),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.borderLight),
+        ),
+        child: const Center(
+          child: Text(
+            'No recent activity sessions',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: data.recentActivitySessions.take(5).map((session) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildActivitySessionCard(session),
+        );
+      }).toList(),
+    );
+  }
+
+  /// Build activity session card
+  Widget _buildActivitySessionCard(ActivitySession session) {
+    // Get engagement color
+    Color engagementColor;
+    if (session.participantEngagement.value >= 8) {
+      engagementColor = AppColors.success;
+    } else if (session.participantEngagement.value >= 5) {
+      engagementColor = AppColors.goldenAmber;
+    } else {
+      engagementColor = AppColors.burntOrange;
+    }
+
+    // Format duration
+    final hours = session.durationMinutes ~/ 60;
+    final minutes = session.durationMinutes % 60;
+    final durationText = hours > 0 
+        ? '${hours}h ${minutes}m'
+        : '${minutes}m';
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppColors.deepBrown.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.local_activity,
+                  color: AppColors.deepBrown,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.activityTitle ?? 'Activity Session',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      session.clientName ?? 'Client',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: engagementColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.star,
+                      size: 12,
+                      color: engagementColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${session.participantEngagement.value}/10',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: engagementColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Icon(Icons.access_time, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                durationText,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Icon(Icons.location_on, size: 14, color: AppColors.textSecondary),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  session.location,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (session.goalProgress.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.success.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.flag, size: 14, color: AppColors.success),
+                  const SizedBox(width: 4),
+                  Text(
+                    '${session.goalProgress.length} goal${session.goalProgress.length != 1 ? 's' : ''} tracked',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.success,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
     );
   }
 

@@ -4,6 +4,7 @@ import '../../data/models/client.dart';
 import '../../data/models/activity.dart';
 import '../../data/models/goal.dart';
 import '../../data/models/user.dart';
+import '../../data/models/activity_session.dart';
 import 'auth_provider.dart';
 
 /// Guardian Dashboard State
@@ -53,6 +54,9 @@ class GuardianDashboardData {
   
   // Recent Activity
   final List<RecentActivityItem> recentActivities;
+  
+  // Recent Activity Sessions
+  final List<ActivitySession> recentActivitySessions;
 
   const GuardianDashboardData({
     required this.activeGoals,
@@ -66,6 +70,7 @@ class GuardianDashboardData {
     required this.totalActivities,
     required this.monthlyReports,
     required this.recentActivities,
+    required this.recentActivitySessions,
   });
 }
 
@@ -176,6 +181,12 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
       
       print('📊 Dashboard: Found $supportWorkersCount support workers via stakeholders:list');
 
+      // Fetch recent activity sessions
+      final activitySessionService = ref.read(activitySessionServiceProvider);
+      final recentActivitySessions = await activitySessionService.listSessions(
+        limit: 10,
+      );
+
       // Process data
       final dashboardData = _processData(
         clients: clients,
@@ -183,6 +194,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         activities: activities,
         shiftNotes: shiftNotes,
         supportWorkersCount: supportWorkersCount,
+        activitySessions: recentActivitySessions,
       );
 
       state = state.copyWith(
@@ -204,6 +216,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
     required List<Activity> activities,
     required List<Map<String, dynamic>> shiftNotes,
     required int supportWorkersCount,
+    required List<ActivitySession> activitySessions,
   }) {
     // Calculate top stats
     final activeGoals = goals.length; // Total count of all goals
@@ -304,6 +317,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
       totalActivities: activities.length,
       monthlyReports: monthlyReports,
       recentActivities: recentActivities,
+      recentActivitySessions: activitySessions,
     );
   }
 
