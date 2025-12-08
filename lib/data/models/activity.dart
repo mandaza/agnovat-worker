@@ -88,7 +88,7 @@ class Activity extends Equatable {
       'stakeholder_id': stakeholderId,
       'title': title,
       'description': description,
-      'activity_type': activityType.name,
+      'activity_type': activityType.toBackendString(),
       'status': status.name,
       'goal_ids': goalIds,
       'outcome_notes': outcomeNotes,
@@ -115,10 +115,8 @@ class Activity extends Equatable {
   }
 
   static ActivityType _parseActivityType(String type) {
-    return ActivityType.values.firstWhere(
-      (e) => e.name == type,
-      orElse: () => ActivityType.other,
-    );
+    // Try parsing from backend format first (snake_case)
+    return ActivityTypeExtension.fromBackendString(type);
   }
 
   static ActivityStatus _parseActivityStatus(String status) {
@@ -168,6 +166,60 @@ extension ActivityTypeExtension on ActivityType {
         return 'Communication';
       case ActivityType.other:
         return 'Other';
+    }
+  }
+
+  /// Convert to backend format (snake_case)
+  String toBackendString() {
+    switch (this) {
+      case ActivityType.lifeSkills:
+        return 'life_skills';
+      case ActivityType.socialRecreation:
+        return 'social_recreation';
+      case ActivityType.personalCare:
+        return 'personal_care';
+      case ActivityType.communityAccess:
+        return 'community_access';
+      case ActivityType.transport:
+        return 'transport';
+      case ActivityType.therapy:
+        return 'therapy';
+      case ActivityType.householdTasks:
+        return 'household_tasks';
+      case ActivityType.employmentEducation:
+        return 'employment_education';
+      case ActivityType.communication:
+        return 'communication';
+      case ActivityType.other:
+        return 'other';
+    }
+  }
+
+  /// Parse from backend format (snake_case)
+  static ActivityType fromBackendString(String type) {
+    switch (type) {
+      case 'life_skills':
+        return ActivityType.lifeSkills;
+      case 'social_recreation':
+        return ActivityType.socialRecreation;
+      case 'personal_care':
+        return ActivityType.personalCare;
+      case 'community_access':
+        return ActivityType.communityAccess;
+      case 'transport':
+        return ActivityType.transport;
+      case 'therapy':
+        return ActivityType.therapy;
+      case 'household_tasks':
+        return ActivityType.householdTasks;
+      case 'employment_education':
+        return ActivityType.employmentEducation;
+      case 'communication':
+        return ActivityType.communication;
+      case 'other':
+        return ActivityType.other;
+      default:
+        return ActivityType.other;
     }
   }
 }

@@ -329,7 +329,7 @@ class McpApiService {
       if (stakeholderId != null) 'stakeholder_id': stakeholderId,
       'title': title,
       if (description != null) 'description': description,
-      'activity_type': activityType.name,
+      'activity_type': activityType.toBackendString(),
       if (status != null) 'status': status.name,
       if (goalIds != null) 'goal_ids': goalIds,
       if (outcomeNotes != null) 'outcome_notes': outcomeNotes,
