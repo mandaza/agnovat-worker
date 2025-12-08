@@ -27,7 +27,7 @@ enum ActivityStatus {
 class Activity extends Equatable {
   final String id;
   final String clientId;
-  final String stakeholderId;
+  final String? stakeholderId;
   final String title;
   final String? description;
   final ActivityType activityType;
@@ -40,7 +40,7 @@ class Activity extends Equatable {
   const Activity({
     required this.id,
     required this.clientId,
-    required this.stakeholderId,
+    this.stakeholderId,
     required this.title,
     this.description,
     required this.activityType,
@@ -85,7 +85,7 @@ class Activity extends Equatable {
     return {
       'id': id,
       'client_id': clientId,
-      'stakeholder_id': stakeholderId,
+      if (stakeholderId != null) 'stakeholder_id': stakeholderId,
       'title': title,
       'description': description,
       'activity_type': activityType.toBackendString(),
@@ -102,7 +102,7 @@ class Activity extends Equatable {
     return Activity(
       id: json['id'] as String,
       clientId: json['client_id'] as String,
-      stakeholderId: json['stakeholder_id'] as String,
+      stakeholderId: json['stakeholder_id'] as String?,
       title: json['title'] as String,
       description: json['description'] as String?,
       activityType: _parseActivityType(json['activity_type'] as String),
