@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../core/providers/service_providers.dart';
+import '../../../data/models/shift_note.dart';
 import '../../widgets/skeleton_loader.dart';
+import '../../widgets/cards/shift_note_card.dart';
 import '../shift_notes/shift_note_details_screen.dart';
 
 /// Guardian Shift Notes Screen - View all submitted shift notes
@@ -14,13 +17,22 @@ class GuardianShiftNotesScreen extends ConsumerStatefulWidget {
       _GuardianShiftNotesScreenState();
 }
 
+enum ShiftNoteFilter { all, submitted }
+
 class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScreen> {
+  final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  ShiftNoteFilter _statusFilter = ShiftNoteFilter.all;
   bool _isLoading = true;
-  List<Map<String, dynamic>> _shiftNotes = [];
+  List<ShiftNote> _shiftNotes = [];
   Map<String, String> _clientNames = {}; // client_id -> name
-  Map<String, String> _workerNames = {}; // user_id -> name
   String? _error;
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -38,8 +50,13 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
       final apiService = ref.read(mcpApiServiceProvider);
       
       // Fetch shift notes and clients
-      final notes = await apiService.listShiftNotes(limit: 100);
+      final notesData = await apiService.listShiftNotes(limit: 100);
       final clients = await apiService.listClients();
+      
+      // Convert Map data to ShiftNote models
+      final notes = notesData.map((noteData) {
+        return ShiftNote.fromJson(noteData);
+      }).toList();
       
       // Build client name lookup map
       final clientNameMap = <String, String>{};
@@ -47,31 +64,9 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
         clientNameMap[client.id] = client.name;
       }
       
-      // Extract unique user IDs from notes
-      final userIds = notes
-          .map((note) => note['user_id'] as String?)
-          .where((id) => id != null)
-          .toSet();
-      
-      // Fetch user information for each unique user ID
-      final workerNameMap = <String, String>{};
-      for (final userId in userIds) {
-        if (userId != null) {
-          try {
-            // Fetch user by ID
-            final user = await apiService.getUserById(userId);
-            workerNameMap[userId] = user.name;
-          } catch (e) {
-            print('Failed to fetch user $userId: $e');
-            workerNameMap[userId] = 'Unknown Worker';
-          }
-        }
-      }
-      
       setState(() {
         _shiftNotes = notes;
         _clientNames = clientNameMap;
-        _workerNames = workerNameMap;
         _isLoading = false;
       });
     } catch (e) {
@@ -82,385 +77,431 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
     }
   }
 
-  Future<void> _viewShiftNoteDetails(String shiftNoteId) async {
-    // Show loading dialog
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
+  List<ShiftNote> get _filteredNotes {
+    var notes = _shiftNotes;
 
-    try {
-      final apiService = ref.read(mcpApiServiceProvider);
-      final shiftNote = await apiService.getShiftNote(shiftNoteId);
-
-      if (!mounted) return;
-
-      // Close loading dialog
-      Navigator.pop(context);
-
-      // Navigate to details screen
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => ShiftNoteDetailsScreen(
-            shiftNoteId: shiftNote.id,
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-
-      // Close loading dialog
-      Navigator.pop(context);
-
-      // Show error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading shift note: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+    // Filter by status
+    if (_statusFilter == ShiftNoteFilter.submitted) {
+      notes = notes.where((note) => !note.isDraft).toList();
     }
-  }
-
-  List<Map<String, dynamic>> get _filteredNotes {
-    // Only show submitted notes
-    var notes = _shiftNotes.where((note) => note['status'] == 'submitted').toList();
 
     // Filter by search query
     if (_searchQuery.isNotEmpty) {
       notes = notes.where((note) {
-        final clientId = note['client_id'] as String?;
-        final userId = note['user_id'] as String?;
-        
-        final clientName = (clientId != null ? _clientNames[clientId] : null) ?? '';
-        final workerName = (userId != null ? _workerNames[userId] : null) ?? '';
-        final title = (note['title'] ?? '').toString();
+        final clientName = _clientNames[note.clientId] ?? '';
         final query = _searchQuery.toLowerCase();
         
         return clientName.toLowerCase().contains(query) ||
-            workerName.toLowerCase().contains(query) ||
-            title.toLowerCase().contains(query);
+            note.shiftDate.toLowerCase().contains(query);
       }).toList();
     }
 
     // Sort by date (most recent first)
     notes.sort((a, b) {
-      final dateA = DateTime.parse(a['created_at'] ?? DateTime.now().toIso8601String());
-      final dateB = DateTime.parse(b['created_at'] ?? DateTime.now().toIso8601String());
+      final dateA = DateTime.parse(a.shiftDate);
+      final dateB = DateTime.parse(b.shiftDate);
       return dateB.compareTo(dateA);
     });
 
     return notes;
   }
 
-  /// Build skeleton loader for shift notes
-  Widget _buildSkeletonLoader() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        children: List.generate(5, (index) {
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: SkeletonListItem(height: 100),
-          );
-        }),
-      ),
-    );
+  int get _submittedNotesCount {
+    return _shiftNotes.where((note) => !note.isDraft).length;
+  }
+
+  /// Group shift notes by date category (Today, Yesterday, This Week, etc.)
+  Map<String, List<ShiftNote>> get _groupedShiftNotes {
+    final grouped = <String, List<ShiftNote>>{};
+    final now = DateTime.now();
+
+    for (final note in _filteredNotes) {
+      final noteDate = DateTime.parse(note.shiftDate);
+      final String category;
+
+      if (_isSameDay(noteDate, now)) {
+        category = 'Today';
+      } else if (_isSameDay(noteDate, now.subtract(const Duration(days: 1)))) {
+        category = 'Yesterday';
+      } else if (noteDate.isAfter(now.subtract(const Duration(days: 7)))) {
+        category = 'This Week';
+      } else if (noteDate.isAfter(now.subtract(const Duration(days: 30)))) {
+        category = 'This Month';
+      } else {
+        category = DateFormat('MMMM yyyy').format(noteDate);
+      }
+
+      grouped.putIfAbsent(category, () => []);
+      grouped[category]!.add(note);
+    }
+
+    return grouped;
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
   @override
   Widget build(BuildContext context) {
     final filteredNotes = _filteredNotes;
+    final groupedNotes = _groupedShiftNotes;
 
     return Scaffold(
       backgroundColor: AppColors.surfaceLight,
-      appBar: AppBar(
-        title: const Text('Submitted Shift Notes'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadShiftNotes,
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Search and Filter Bar
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.shadowLight,
-                  blurRadius: 4,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Column(
-              children: [
-                // Search Bar
-                TextField(
-                  decoration: InputDecoration(
-                    hintText: 'Search by client, worker, or title...',
-                    prefixIcon: const Icon(Icons.search),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear),
-                            onPressed: () {
-                              setState(() {
-                                _searchQuery = '';
-                              });
-                            },
-                          )
-                        : null,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: AppColors.borderLight),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                // Submitted count indicator
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppColors.success.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        size: 16,
-                        color: AppColors.success,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        '${filteredNotes.length} Submitted ${filteredNotes.length == 1 ? 'Note' : 'Notes'}',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Notes List
-          Expanded(
-            child: _error != null
-                ? _buildErrorState()
-                : _isLoading && filteredNotes.isEmpty
-                    ? _buildSkeletonLoader()
-                    : filteredNotes.isEmpty
-                        ? _buildEmptyState()
-                        : RefreshIndicator(
-                            onRefresh: _loadShiftNotes,
-                            child: ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filteredNotes.length,
-                              itemBuilder: (context, index) {
-                                return _buildShiftNoteCard(
-                                    filteredNotes[index]);
-                              },
-                            ),
-                          ),
-          ),
-        ],
-      ),
+      body: _error != null
+          ? _buildError()
+          : _buildContent(filteredNotes, groupedNotes),
     );
   }
 
-  Widget _buildShiftNoteCard(Map<String, dynamic> note) {
-    final clientId = note['client_id'] as String?;
-    final userId = note['user_id'] as String?;
-    
-    final clientName = (clientId != null ? _clientNames[clientId] : null) ?? 'Unknown Client';
-    final workerName = (userId != null ? _workerNames[userId] : null) ?? 'Unknown Worker';
-    final title = note['title'] ?? 'Shift Note';
-    final dateStr = note['shift_date'] ?? note['created_at'];
+  /// Build main content
+  Widget _buildContent(
+    List<ShiftNote> filteredNotes,
+    Map<String, List<ShiftNote>> groupedNotes,
+  ) {
+    return Column(
+      children: [
+        // Header
+        _buildHeader(),
 
-    // Format date
-    String formattedDate = 'Unknown date';
-    if (dateStr != null) {
-      try {
-        final date = DateTime.parse(dateStr);
-        formattedDate = '${date.day}/${date.month}/${date.year}';
-      } catch (e) {
-        formattedDate = 'Invalid date';
-      }
-    }
+        // Search and Filters
+        _buildSearchAndFilters(),
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: AppColors.borderLight),
-      ),
-      child: InkWell(
-        onTap: () async {
-          // Fetch full shift note and navigate to details
-          await _viewShiftNoteDetails(note['id'] as String);
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header Row
-              Row(
+        // Content
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadShiftNotes,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          workerName,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                  // Results count
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${filteredNotes.length} ${filteredNotes.length == 1 ? 'Note' : 'Notes'}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      if (_searchQuery.isNotEmpty)
+                        TextButton.icon(
+                          onPressed: () {
+                            _searchController.clear();
+                            setState(() {
+                              _searchQuery = '';
+                              _statusFilter = ShiftNoteFilter.all;
+                            });
+                          },
+                          icon: const Icon(Icons.clear, size: 16),
+                          label: const Text('Clear Filters'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: AppColors.deepBrown,
+                            textStyle: const TextStyle(fontSize: 12),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(
-                              Icons.person_outline,
-                              size: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                clientName,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                    ],
                   ),
+
+                  const SizedBox(height: 16),
+
+                  // Shift Notes List
+                  if (_isLoading && filteredNotes.isEmpty)
+                    _buildShiftNotesSkeleton()
+                  else if (filteredNotes.isEmpty)
+                    _buildEmptyState()
+                  else
+                    _buildShiftNotesList(groupedNotes),
+
+                  const SizedBox(height: 100), // Space for bottom nav
                 ],
               ),
-              const SizedBox(height: 12),
-              // Title
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textPrimary,
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 12),
-              // Footer Row
-              Row(
-                children: [
-                  // Date
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.surfaceLight,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          formattedDate,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  // View Details Arrow
-                  const Icon(
-                    Icons.arrow_forward_ios,
-                    size: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
+        ),
+      ],
+    );
+  }
+
+  /// Build header with title and subtitle
+  Widget _buildHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.borderLight,
+            width: 1,
+          ),
+        ),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      child: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.arrow_back, color: AppColors.textPrimary),
+              onPressed: () => Navigator.of(context).pop(),
+            ),
+            const Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Shift Notes',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Review shift documentation from support workers',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 48), // Balance the back button
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-          const Icon(
-            Icons.description_outlined,
-            size: 80,
-            color: AppColors.textSecondary,
+  Widget _buildSearchAndFilters() {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Column(
+        children: [
+          // Search Bar
+          TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search shift notes...',
+              hintStyle: const TextStyle(color: AppColors.textSecondary),
+              prefixIcon: const Icon(Icons.search, color: AppColors.textSecondary),
+              suffixIcon: _searchQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _searchQuery = '';
+                        });
+                      },
+                    )
+                  : null,
+              filled: true,
+              fillColor: AppColors.surfaceLight,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+            onChanged: (value) {
+              setState(() {
+                _searchQuery = value;
+              });
+            },
           ),
-            const SizedBox(height: 24),
+
+          const SizedBox(height: 12),
+
+          // Status Filter Chips (All/Submitted)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildStatusChip(
+                  label: 'All Notes',
+                  count: _shiftNotes.length,
+                  isSelected: _statusFilter == ShiftNoteFilter.all,
+                  onTap: () {
+                    setState(() {
+                      _statusFilter = ShiftNoteFilter.all;
+                    });
+                  },
+                ),
+                const SizedBox(width: 8),
+                _buildStatusChip(
+                  label: 'Submitted',
+                  count: _submittedNotesCount,
+                  isSelected: _statusFilter == ShiftNoteFilter.submitted,
+                  onTap: () {
+                    setState(() {
+                      _statusFilter = ShiftNoteFilter.submitted;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStatusChip({
+    required String label,
+    required int count,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.deepBrown : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? AppColors.deepBrown : AppColors.borderLight,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
             Text(
-              _searchQuery.isNotEmpty
-                  ? 'No submitted notes found'
-                  : 'No submitted shift notes yet',
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: isSelected ? Colors.white : AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : AppColors.surfaceLight,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                count.toString(),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build shift notes list with groups
+  Widget _buildShiftNotesList(Map<String, List<ShiftNote>> groupedNotes) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: groupedNotes.entries.map((entry) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section header
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                entry.key,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w400,
+                  color: AppColors.textSecondary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+
+            // Shift notes in this section
+            ...entry.value.map((note) => Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: ShiftNoteCard(
+                    shiftNote: note,
+                    clientName: _clientNames[note.clientId],
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              ShiftNoteDetailsScreen(shiftNoteId: note.id),
+                        ),
+                      );
+                    },
+                  ),
+                )),
+
+            const SizedBox(height: 12),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  /// Build skeleton for shift notes list
+  Widget _buildShiftNotesSkeleton() {
+    return Column(
+      children: List.generate(5, (index) {
+        return const Padding(
+          padding: EdgeInsets.only(bottom: 8),
+          child: SkeletonListItem(height: 100),
+        );
+      }),
+    );
+  }
+
+  /// Build empty state
+  Widget _buildEmptyState() {
+    final hasFilters = _searchQuery.isNotEmpty ||
+        _statusFilter != ShiftNoteFilter.all;
+
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderLight),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(
+              hasFilters ? Icons.search_off : Icons.description_outlined,
+              size: 64,
+              color: AppColors.textSecondary,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              hasFilters ? 'No notes found' : 'No shift notes yet',
               style: const TextStyle(
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              _searchQuery.isNotEmpty
-                  ? 'Try adjusting your search'
-                  : 'Submitted shift notes from support workers will appear here',
+              hasFilters
+                  ? 'Try adjusting your search or filters'
+                  : 'Shift notes from support workers will appear here',
               style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textSecondary,
@@ -473,10 +514,11 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
     );
   }
 
-  Widget _buildErrorState() {
+  /// Build error state
+  Widget _buildError() {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32),
+        padding: const EdgeInsets.all(24),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -487,7 +529,7 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
             ),
             const SizedBox(height: 16),
             const Text(
-              'Error loading shift notes',
+              'Failed to load shift notes',
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
@@ -496,21 +538,19 @@ class _GuardianShiftNotesScreenState extends ConsumerState<GuardianShiftNotesScr
             const SizedBox(height: 8),
             Text(
               _error ?? 'Unknown error',
+              textAlign: TextAlign.center,
               style: const TextStyle(
-                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
+            ElevatedButton(
               onPressed: _loadShiftNotes,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
               ),
+              child: const Text('Retry'),
             ),
           ],
         ),
