@@ -294,75 +294,223 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
   }
 
   Widget _buildClientDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: DropdownButtonFormField<String>(
-        value: _selectedClientId,
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+    final selectedClient = _selectedClientId != null
+        ? _clients.firstWhere((c) => c.id == _selectedClientId, orElse: () => _clients.first)
+        : null;
+
+    return InkWell(
+      onTap: widget.preselectedClientId == null ? _showClientSelector : null,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: widget.preselectedClientId != null
+              ? AppColors.grey100.withOpacity(0.5)
+              : AppColors.white,
+          border: Border.all(
+            color: widget.preselectedClientId != null
+                ? AppColors.borderLight.withOpacity(0.5)
+                : AppColors.borderLight,
+          ),
+          borderRadius: BorderRadius.circular(16),
         ),
-        hint: const Text('Select a client'),
-        isExpanded: true,
-        items: _clients.map((client) {
-          return DropdownMenuItem(
-            value: client.id,
-            child: Text(client.name),
-          );
-        }).toList(),
-        onChanged: widget.preselectedClientId == null
-            ? (value) {
-                setState(() {
-                  _selectedClientId = value;
-                });
-                if (value != null) {
-                  _loadGoalsForClient(value);
-                }
-              }
-            : null, // Disable if preselected
-        validator: (value) {
-          if (value == null) {
-            return 'Please select a client';
-          }
-          return null;
-        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              selectedClient?.name ?? 'Select a client',
+              style: TextStyle(
+                fontSize: 16,
+                color: selectedClient != null
+                    ? AppColors.textPrimary
+                    : AppColors.textSecondary,
+              ),
+            ),
+            if (widget.preselectedClientId != null)
+              const Icon(Icons.lock_outline, size: 16, color: AppColors.textSecondary)
+            else
+              const Icon(Icons.keyboard_arrow_down, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showClientSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.grey200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Select Client',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: _clients.length,
+                itemBuilder: (context, index) {
+                  final client = _clients[index];
+                  final isSelected = _selectedClientId == client.id;
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    title: Text(
+                      client.name,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? AppColors.deepBrown : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.deepBrown)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedClientId = client.id;
+                      });
+                      _loadGoalsForClient(client.id);
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 
   Widget _buildActivityTypeDropdown() {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderLight),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: DropdownButtonFormField<ActivityType>(
-        value: _selectedActivityType,
-        decoration: const InputDecoration(
-          border: InputBorder.none,
-          contentPadding: EdgeInsets.zero,
+    return InkWell(
+      onTap: _showActivityTypeSelector,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          border: Border.all(color: AppColors.borderLight),
+          borderRadius: BorderRadius.circular(16),
         ),
-        isExpanded: true,
-        items: ActivityType.values.map((type) {
-          return DropdownMenuItem(
-            value: type,
-            child: Text(type.displayName),
-          );
-        }).toList(),
-        onChanged: (value) {
-          if (value != null) {
-            setState(() {
-              _selectedActivityType = value;
-            });
-          }
-        },
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              _selectedActivityType.displayName,
+              style: const TextStyle(
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const Icon(Icons.keyboard_arrow_down, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showActivityTypeSelector() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.7,
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 16),
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.grey200,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Text(
+                'Select Activity Type',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                itemCount: ActivityType.values.length,
+                itemBuilder: (context, index) {
+                  final type = ActivityType.values[index];
+                  final isSelected = _selectedActivityType == type;
+
+                  return ListTile(
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                    title: Text(
+                      type.displayName,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+                        color: isSelected ? AppColors.deepBrown : AppColors.textPrimary,
+                      ),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: AppColors.deepBrown)
+                        : null,
+                    onTap: () {
+                      setState(() {
+                        _selectedActivityType = type;
+                      });
+                      Navigator.pop(context);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
