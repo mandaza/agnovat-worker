@@ -62,10 +62,12 @@ final _shiftNotesListProvider = FutureProvider.autoDispose.family<List<Map<Strin
 /// - Does NOT show NDIS number or full DOB (privacy restriction)
 class ClientDetailsScreen extends ConsumerStatefulWidget {
   final Client client;
+  final int initialTabIndex;
 
   const ClientDetailsScreen({
     super.key,
     required this.client,
+    this.initialTabIndex = 0,
   });
 
   @override
@@ -79,7 +81,11 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(
+      length: 4,
+      vsync: this,
+      initialIndex: widget.initialTabIndex,
+    );
   }
 
   @override

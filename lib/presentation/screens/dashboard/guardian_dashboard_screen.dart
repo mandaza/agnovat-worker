@@ -5,10 +5,12 @@ import '../../../data/models/user.dart';
 import '../../../data/models/activity_session.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/guardian_dashboard_provider.dart';
+import '../../../core/providers/service_providers.dart';
 import '../profile/profile_screen.dart';
 import '../guardian/guardian_shift_notes_screen.dart';
 import '../guardian/create_activity_session_screen.dart';
 import '../activities/create_activity_screen.dart';
+import '../clients/client_details_screen.dart';
 
 /// Guardian Dashboard Screen for Family Members
 class GuardianDashboardScreen extends ConsumerStatefulWidget {
@@ -183,9 +185,7 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
                           ),
                         ),
                         TextButton(
-                          onPressed: () {
-                            // TODO: Navigate to all goals
-                          },
+                          onPressed: () => _navigateToClientGoals(data),
                           child: const Text(
                             'View All',
                             style: TextStyle(
@@ -889,6 +889,42 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
         ),
       ),
     );
+  }
+
+  // Navigate to client details screen with goals tab
+  Future<void> _navigateToClientGoals(GuardianDashboardData data) async {
+    if (data.clientGoals.isEmpty) return;
+
+    // Get the first client with goals
+    final firstClientGoal = data.clientGoals.first;
+    final clientId = firstClientGoal.clientId;
+
+    try {
+      // Fetch the full client details
+      final apiService = ref.read(mcpApiServiceProvider);
+      final client = await apiService.getClient(clientId);
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ClientDetailsScreen(
+              client: client,
+              initialTabIndex: 1, // Goals tab (0=Overview, 1=Goals, 2=Activities, 3=Notes)
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading client: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   // Show menu to choose between creating activity or activity session

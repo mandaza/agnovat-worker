@@ -89,10 +89,12 @@ class GoalProgressWeek {
 
 /// Client Goals Data
 class ClientGoalsData {
+  final String clientId;
   final String clientName;
   final List<GoalItem> goals;
 
   const ClientGoalsData({
+    required this.clientId,
     required this.clientName,
     required this.goals,
   });
@@ -287,18 +289,24 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
     ];
 
     // Client goals breakdown (top 2 clients with most goals)
-    final clientGoalsMap = <String, List<Goal>>{};
+    final clientGoalsMap = <String, Map<String, dynamic>>{};
     for (var goal in goals) {
       final clientId = goal.clientId;
       final client = clients.firstWhere((c) => c.id == clientId, orElse: () => clients.first);
-      clientGoalsMap.putIfAbsent(client.name, () => []).add(goal);
+      clientGoalsMap.putIfAbsent(client.id, () => {
+        'clientId': client.id,
+        'clientName': client.name,
+        'goals': <Goal>[],
+      });
+      (clientGoalsMap[client.id]!['goals'] as List<Goal>).add(goal);
     }
 
-    final clientGoals = clientGoalsMap.entries
+    final clientGoals = clientGoalsMap.values
         .take(2)
         .map((entry) => ClientGoalsData(
-              clientName: entry.key,
-              goals: entry.value.take(3).map((g) {
+              clientId: entry['clientId'] as String,
+              clientName: entry['clientName'] as String,
+              goals: (entry['goals'] as List<Goal>).take(3).map((g) {
                 return GoalItem(
                   title: g.title,
                   progress: '${g.progressPercentage}% complete',
