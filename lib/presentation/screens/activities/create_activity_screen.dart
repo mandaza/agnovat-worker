@@ -120,10 +120,10 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
     try {
       final apiService = ref.read(mcpApiServiceProvider);
       final authState = ref.read(authProvider);
-      final stakeholderId = authState.user?.id;
+      final stakeholderId = authState.user?.stakeholderId;
 
       if (stakeholderId == null) {
-        throw Exception('User not authenticated');
+        throw Exception('User does not have an associated stakeholder record');
       }
 
       await apiService.createActivity(
