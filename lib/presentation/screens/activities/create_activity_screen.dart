@@ -26,7 +26,6 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
   final _descriptionController = TextEditingController();
 
   String? _selectedClientId;
-  String? _selectedStakeholderId;
   ActivityType _selectedActivityType = ActivityType.lifeSkills;
   List<String> _selectedGoalIds = [];
   bool _isLoading = false;
@@ -34,7 +33,6 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
 
   List<Client> _clients = [];
   List<Goal> _availableGoals = [];
-  List<Map<String, dynamic>> _stakeholders = [];
 
   @override
   void initState() {
@@ -53,36 +51,10 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
   Future<void> _loadInitialData() async {
     try {
       final apiService = ref.read(mcpApiServiceProvider);
-      final authState = ref.read(authProvider);
-      
-      // Load clients and stakeholders in parallel
-      final results = await Future.wait([
-        apiService.listClients(active: true),
-        apiService.listStakeholders(role: 'support_worker', active: true, limit: 100),
-      ]);
-
-      final clients = results[0] as List<Client>;
-      final stakeholders = results[1];
+      final clients = await apiService.listClients(active: true);
 
       setState(() {
         _clients = clients;
-        _stakeholders = List<Map<String, dynamic>>.from(stakeholders);
-        
-        // If user is a support worker (has stakeholderId), auto-select them
-        if (authState.user?.stakeholderId != null) {
-          final userStakeholderId = authState.user!.stakeholderId;
-          
-          // Try to find matching stakeholder in the list (check 'id' field)
-          final matchingStakeholder = _stakeholders.firstWhere(
-            (s) => s['id'] == userStakeholderId,
-            orElse: () => {},
-          );
-          
-          if (matchingStakeholder.isNotEmpty) {
-            _selectedStakeholderId = userStakeholderId;
-          }
-        }
-        
         _isLoadingData = false;
       });
 
@@ -141,26 +113,20 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
       return;
     }
 
-    if (_selectedStakeholderId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please assign a support worker'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
     setState(() {
       _isLoading = true;
     });
 
     try {
       final apiService = ref.read(mcpApiServiceProvider);
+      final authState = ref.read(authProvider);
+
+      // Use user's stakeholderId if they have one, otherwise null
+      final stakeholderId = authState.user?.stakeholderId;
 
       await apiService.createActivity(
         clientId: _selectedClientId!,
-        stakeholderId: _selectedStakeholderId!,
+        stakeholderId: stakeholderId ?? '', // Send empty string if null
         title: _titleController.text.trim(),
         description: _descriptionController.text.trim().isEmpty
             ? null
@@ -258,12 +224,6 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
                     _buildSectionTitle('Activity Type'),
                     const SizedBox(height: 12),
                     _buildActivityTypeDropdown(),
-                    const SizedBox(height: 24),
-
-                    // Assign Support Worker
-                    _buildSectionTitle('Assign to Support Worker'),
-                    const SizedBox(height: 12),
-                    _buildStakeholderDropdown(),
                     const SizedBox(height: 24),
 
                     // Description
@@ -546,131 +506,6 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
                   );
                 },
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStakeholderDropdown() {
-    final selectedStakeholder = _selectedStakeholderId != null
-        ? _stakeholders.firstWhere(
-            (s) => s['_id'] == _selectedStakeholderId,
-            orElse: () => {},
-          )
-        : null;
-
-    return InkWell(
-      onTap: _showStakeholderSelector,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          border: Border.all(color: AppColors.borderLight),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                selectedStakeholder != null && selectedStakeholder.isNotEmpty
-                    ? (selectedStakeholder['name'] as String? ?? 'Unknown')
-                    : 'Select support worker',
-                style: TextStyle(
-                  fontSize: 16,
-                  color: selectedStakeholder != null && selectedStakeholder.isNotEmpty
-                      ? AppColors.textPrimary
-                      : AppColors.textSecondary,
-                ),
-              ),
-            ),
-            const Icon(Icons.keyboard_arrow_down, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showStakeholderSelector() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        decoration: const BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.only(
-            topLeft: Radius.circular(20),
-            topRight: Radius.circular(20),
-          ),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.grey200,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: Text(
-                'Select Support Worker',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: _stakeholders.isEmpty
-                  ? const Center(
-                      child: Text(
-                        'No support workers available',
-                        style: TextStyle(color: AppColors.textSecondary),
-                      ),
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      itemCount: _stakeholders.length,
-                      itemBuilder: (context, index) {
-                        final stakeholder = _stakeholders[index];
-                        final stakeholderId = stakeholder['_id'] as String?;
-                        final name = stakeholder['name'] as String? ?? 'Unknown';
-                        final isSelected = _selectedStakeholderId == stakeholderId;
-
-                        return ListTile(
-                          contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                          title: Text(
-                            name,
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                              color: isSelected ? AppColors.deepBrown : AppColors.textPrimary,
-                            ),
-                          ),
-                          trailing: isSelected
-                              ? const Icon(Icons.check_circle, color: AppColors.deepBrown)
-                              : null,
-                          onTap: () {
-                            setState(() {
-                              _selectedStakeholderId = stakeholderId;
-                            });
-                            Navigator.pop(context);
-                          },
-                        );
-                      },
-                    ),
             ),
           ],
         ),
