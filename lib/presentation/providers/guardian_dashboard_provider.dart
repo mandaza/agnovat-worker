@@ -187,6 +187,54 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         limit: 10,
       );
 
+      // Enrich activity sessions with activity and client names if not present
+      final enrichedSessions = recentActivitySessions.map((session) {
+        // Find activity details if not already populated
+        String? activityTitle = session.activityTitle;
+        String? clientName = session.clientName;
+        
+        if (activityTitle == null || activityTitle.isEmpty) {
+          final activity = activities.firstWhere(
+            (a) => a.id == session.activityId,
+            orElse: () => activities.first,
+          );
+          activityTitle = activity.title;
+        }
+        
+        if (clientName == null || clientName.isEmpty) {
+          final client = clients.firstWhere(
+            (c) => c.id == session.clientId,
+            orElse: () => clients.first,
+          );
+          clientName = client.name;
+        }
+        
+        // Return session with enriched data
+        return ActivitySession(
+          id: session.id,
+          activityId: session.activityId,
+          clientId: session.clientId,
+          stakeholderId: session.stakeholderId,
+          shiftNoteId: session.shiftNoteId,
+          sessionStartTime: session.sessionStartTime,
+          sessionEndTime: session.sessionEndTime,
+          durationMinutes: session.durationMinutes,
+          location: session.location,
+          sessionNotes: session.sessionNotes,
+          participantEngagement: session.participantEngagement,
+          goalProgress: session.goalProgress,
+          behaviorIncidents: session.behaviorIncidents,
+          media: session.media,
+          createdAt: session.createdAt,
+          updatedAt: session.updatedAt,
+          activityTitle: activityTitle,
+          activityType: session.activityType,
+          clientName: clientName,
+          stakeholderName: session.stakeholderName,
+          goalTitles: session.goalTitles,
+        );
+      }).toList();
+
       // Process data
       final dashboardData = _processData(
         clients: clients,
@@ -194,7 +242,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         activities: activities,
         shiftNotes: shiftNotes,
         supportWorkersCount: supportWorkersCount,
-        activitySessions: recentActivitySessions,
+        activitySessions: enrichedSessions,
       );
 
       state = state.copyWith(
