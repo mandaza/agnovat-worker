@@ -8,6 +8,7 @@ import '../../providers/guardian_dashboard_provider.dart';
 import '../profile/profile_screen.dart';
 import '../guardian/guardian_shift_notes_screen.dart';
 import '../guardian/create_activity_session_screen.dart';
+import '../activities/create_activity_screen.dart';
 
 /// Guardian Dashboard Screen for Family Members
 class GuardianDashboardScreen extends ConsumerStatefulWidget {
@@ -848,7 +849,7 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
     );
   }
 
-  // Floating Action Button for quick shift note creation
+  // Floating Action Button with menu for creating activities or sessions
   Widget _buildFloatingActionButton(BuildContext context) {
     return Container(
       width: 64,
@@ -876,14 +877,7 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => const CreateActivitySessionScreen(),
-              ),
-            );
-          },
+          onTap: () => _showCreateMenu(context),
           borderRadius: BorderRadius.circular(32),
           child: const Center(
             child: Icon(
@@ -891,6 +885,121 @@ class _GuardianDashboardScreenState extends ConsumerState<GuardianDashboardScree
               color: Colors.white,
               size: 32,
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Show menu to choose between creating activity or activity session
+  void _showCreateMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 16),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.grey200,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  'What would you like to create?',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.deepBrown.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.event_note,
+                    color: AppColors.deepBrown,
+                  ),
+                ),
+                title: const Text(
+                  'New Activity',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Create a new activity for a client',
+                  style: TextStyle(fontSize: 14),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateActivityScreen(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.burntOrange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.local_activity,
+                    color: AppColors.burntOrange,
+                  ),
+                ),
+                title: const Text(
+                  'Activity Session',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Log a completed activity session',
+                  style: TextStyle(fontSize: 14),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const CreateActivitySessionScreen(),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 16),
+            ],
           ),
         ),
       ),
