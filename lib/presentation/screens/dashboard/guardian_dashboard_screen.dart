@@ -8,7 +8,6 @@ import '../../providers/guardian_dashboard_provider.dart';
 import '../profile/profile_screen.dart';
 import '../guardian/guardian_shift_notes_screen.dart';
 import '../guardian/create_activity_session_screen.dart';
-import '../../utils/logout_helper.dart';
 
 /// Guardian Dashboard Screen for Family Members
 class GuardianDashboardScreen extends ConsumerStatefulWidget {
