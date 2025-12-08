@@ -68,29 +68,18 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
         _clients = clients;
         _stakeholders = List<Map<String, dynamic>>.from(stakeholders);
         
-        // Debug logging
-        print('🔍 User stakeholderId: ${authState.user?.stakeholderId}');
-        print('🔍 Available stakeholders: ${_stakeholders.length}');
-        if (_stakeholders.isNotEmpty) {
-          print('🔍 First stakeholder structure: ${_stakeholders.first.keys}');
-          print('🔍 First stakeholder: ${_stakeholders.first}');
-        }
-        
-        // If user has a stakeholder ID, pre-select it
+        // If user is a support worker (has stakeholderId), auto-select them
         if (authState.user?.stakeholderId != null) {
           final userStakeholderId = authState.user!.stakeholderId;
           
-          // Try to find matching stakeholder in the list
+          // Try to find matching stakeholder in the list (check 'id' field)
           final matchingStakeholder = _stakeholders.firstWhere(
-            (s) => s['_id'] == userStakeholderId || s['id'] == userStakeholderId,
+            (s) => s['id'] == userStakeholderId,
             orElse: () => {},
           );
           
           if (matchingStakeholder.isNotEmpty) {
             _selectedStakeholderId = userStakeholderId;
-            print('✅ Auto-selected stakeholder: ${matchingStakeholder['name']}');
-          } else {
-            print('⚠️ User stakeholder ID not found in list');
           }
         }
         
