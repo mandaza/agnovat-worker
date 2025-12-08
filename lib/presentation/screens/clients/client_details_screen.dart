@@ -8,20 +8,20 @@ import '../../../core/providers/service_providers.dart';
 import '../../../core/config/api_config.dart';
 import '../../providers/auth_provider.dart';
 
-/// Provider for client goals list
+/// Provider for client goals list (all goals, including archived)
 final _goalsListProvider = FutureProvider.autoDispose.family<List<Goal>, String>((ref, clientId) async {
   final convexClient = ref.watch(convexClientProvider);
   final result = await convexClient.query<List<dynamic>?>(
     ApiConfig.goalsList,
-    args: {'client_id': clientId, 'archived': false},
+    args: {'client_id': clientId},
   );
   return (result ?? []).map((json) => Goal.fromJson(json as Map<String, dynamic>)).toList();
 });
 
-/// Provider for client activities list
+/// Provider for client activities list (all activities)
 final _activitiesListProvider = FutureProvider.autoDispose.family<List<Activity>, String>((ref, clientId) async {
   final apiService = ref.watch(mcpApiServiceProvider);
-  return await apiService.listActivities(clientId: clientId, limit: 20);
+  return await apiService.listActivities(clientId: clientId, limit: 1000);
 });
 
 /// Provider for client shift notes list
@@ -442,12 +442,12 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle('Active Goals'),
+              _buildSectionTitle('All Goals'),
               const SizedBox(height: 12),
               goalsAsync.when(
                 data: (goals) {
                   if (goals.isEmpty) {
-                    return _buildEmptyState('No active goals for this client.');
+                    return _buildEmptyState('No goals for this client.');
                   }
                   return Column(
                     children: goals.map((goal) => _buildGoalCard(goal)).toList(),
@@ -477,7 +477,7 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildSectionTitle('Recent Activities'),
+              _buildSectionTitle('All Activities'),
               const SizedBox(height: 12),
               activitiesAsync.when(
                 data: (activities) {
