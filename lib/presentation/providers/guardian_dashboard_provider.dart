@@ -161,9 +161,8 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         apiService.listGoals(),
         apiService.listActivities(limit: 100),
         apiService.getRecentShiftNotes(limit: 20),
-        // Fetch all users and filter client-side to ensure accurate count
-        // This avoids potential backend filtering issues with role formats
-        apiService.listUsers(limit: 100),
+        // Fetch support workers specifically using snake_case as requested
+        apiService.listUsers(role: 'support_worker', limit: 100),
       ]);
 
       final clients = (results[0] as List<Client>?) ?? [];
@@ -171,17 +170,13 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
       final activities = (results[2] as List<Activity>?) ?? [];
       final shiftNotes = (results[3] as List<Map<String, dynamic>>?) ?? [];
       
-      final allUsers = (results[4] as List<dynamic>?)?.cast<User>() ?? [];
-      
-      // Filter for support workers (active or inactive to debug)
-      // We'll filter for active ones primarily, but if count is 0, we might want to check data
-      final supportWorkers = allUsers.where((u) => 
-        u.role == UserRole.supportWorker
-      ).toList();
+      final supportWorkers = (results[4] as List<dynamic>?)?.cast<User>() ?? [];
       
       // Log for debugging
-      print('📊 Dashboard: Found ${allUsers.length} total users');
-      print('📊 Dashboard: Found ${supportWorkers.length} support workers (active: ${supportWorkers.where((u) => u.active).length})');
+      print('📊 Dashboard: Fetched ${supportWorkers.length} users with role=support_worker');
+      for (var u in supportWorkers) {
+        print('   - Worker: ${u.name}, Role: ${u.role}, Active: ${u.active}');
+      }
 
       // Process data
       final dashboardData = _processData(
