@@ -66,7 +66,7 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
 
       setState(() {
         _clients = clients;
-        _stakeholders = stakeholders.cast<Map<String, dynamic>>();
+        _stakeholders = List<Map<String, dynamic>>.from(stakeholders);
         
         // If user has a stakeholder ID, pre-select it
         if (authState.user?.stakeholderId != null) {
