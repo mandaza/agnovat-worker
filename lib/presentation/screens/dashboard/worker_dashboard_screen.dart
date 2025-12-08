@@ -9,7 +9,7 @@ import '../../utils/logout_helper.dart';
 import '../profile/profile_screen.dart';
 import '../clients/clients_list_screen.dart';
 import '../shift_notes/shift_notes_list_screen.dart';
-import '../ai_assistant/ai_assistant_screen.dart';
+import '../shift_notes/create_shift_note_screen.dart';
 import '../reviews/unacknowledged_reviews_screen.dart';
 
 /// Worker Dashboard Screen
@@ -19,19 +19,10 @@ class WorkerDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final authState = ref.watch(authProvider);
-    final dashboardState = ref.watch(dashboardProvider);
-
-    // If user is logged out or logging out, return to login immediately.
-    if (!authState.isAuthenticated || authState.isLoggingOut) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (context.mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
-        }
-      });
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
+    // Avoid firing dashboard fetches when logging out or unauthenticated.
+    final dashboardState = (!authState.isAuthenticated || authState.isLoggingOut)
+        ? const DashboardState(isLoading: true)
+        : ref.watch(dashboardProvider);
 
     // Show loading while initializing auth
     if (authState.isLoading) {
@@ -735,7 +726,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
     );
   }
 
-  // Floating AI Button
+  // Floating Action Button for quick shift note creation
   Widget _buildFloatingAIButton(BuildContext context) {
     return Container(
       width: 64,
@@ -760,34 +751,26 @@ class WorkerDashboardScreen extends ConsumerWidget {
           ),
         ],
       ),
-      child: Stack(
-        children: [
-          Center(
-            child: IconButton(
-              icon: const Icon(Icons.chat_bubble, color: Colors.white, size: 28),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (context) => const AiAssistantScreen(),
-                  ),
-                );
-              },
-              padding: EdgeInsets.zero,
-            ),
-          ),
-          Positioned(
-            right: 0,
-            top: 0,
-            child: Container(
-              width: 12,
-              height: 12,
-              decoration: const BoxDecoration(
-                color: AppColors.goldenAmber,
-                shape: BoxShape.circle,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const CreateShiftNoteScreen(),
               ),
+            );
+          },
+          borderRadius: BorderRadius.circular(32),
+          child: const Center(
+            child: Icon(
+              Icons.add,
+              color: Colors.white,
+              size: 32,
             ),
           ),
-        ],
+        ),
       ),
     );
   }
