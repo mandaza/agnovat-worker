@@ -231,84 +231,98 @@ class _ClientDetailsScreenState extends ConsumerState<ClientDetailsScreen>
 
   /// Client Info Card with quick stats
   Widget _buildClientInfoCard(BuildContext context) {
-    final clientWithStats = widget.client is ClientWithStats
-        ? widget.client as ClientWithStats
-        : null;
-
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24.0),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderLight),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadowLight,
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.flag_outlined,
-                    value: clientWithStats?.activeGoalsCount.toString() ?? '0',
-                    label: 'Active Goals',
-                    color: AppColors.deepBrown,
-                  ),
-                ),
-                Container(
-                  width: 1,
-                  height: 40,
-                  color: AppColors.borderLight,
-                ),
-                Expanded(
-                  child: _buildStatItem(
-                    icon: Icons.event_note_outlined,
-                    value: clientWithStats?.totalActivitiesCount.toString() ?? '0',
-                    label: 'Activities',
-                    color: AppColors.goldenAmber,
-                  ),
+      child: Consumer(
+        builder: (context, ref, child) {
+          // Fetch real counts from the same providers used in tabs
+          final goalsAsync = ref.watch(_goalsListProvider(widget.client.id));
+          final activitiesAsync = ref.watch(_activitiesListProvider(widget.client.id));
+
+          final goalsCount = goalsAsync.maybeWhen(
+            data: (goals) => goals.length,
+            orElse: () => 0,
+          );
+
+          final activitiesCount = activitiesAsync.maybeWhen(
+            data: (activities) => activities.length,
+            orElse: () => 0,
+          );
+
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderLight),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.shadowLight,
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
                 ),
               ],
             ),
-            if (widget.client.active) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: AppColors.success,
-                      size: 18,
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.flag_outlined,
+                        value: goalsCount.toString(),
+                        label: 'Goals',
+                        color: AppColors.deepBrown,
+                      ),
                     ),
-                    const SizedBox(width: 8),
-                    const Text(
-                      'Active Client',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success,
+                    Container(
+                      width: 1,
+                      height: 40,
+                      color: AppColors.borderLight,
+                    ),
+                    Expanded(
+                      child: _buildStatItem(
+                        icon: Icons.event_note_outlined,
+                        value: activitiesCount.toString(),
+                        label: 'Activities',
+                        color: AppColors.goldenAmber,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ],
-        ),
+                if (widget.client.active) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle,
+                          color: AppColors.success,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Active Client',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.success,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+        },
       ),
     );
   }
