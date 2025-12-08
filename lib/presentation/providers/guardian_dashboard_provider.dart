@@ -172,10 +172,16 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
       final shiftNotes = (results[3] as List<Map<String, dynamic>>?) ?? [];
       
       final allUsers = (results[4] as List<dynamic>?)?.cast<User>() ?? [];
-      // Filter for active support workers
+      
+      // Filter for support workers (active or inactive to debug)
+      // We'll filter for active ones primarily, but if count is 0, we might want to check data
       final supportWorkers = allUsers.where((u) => 
-        u.role == UserRole.supportWorker && u.active
+        u.role == UserRole.supportWorker
       ).toList();
+      
+      // Log for debugging
+      print('📊 Dashboard: Found ${allUsers.length} total users');
+      print('📊 Dashboard: Found ${supportWorkers.length} support workers (active: ${supportWorkers.where((u) => u.active).length})');
 
       // Process data
       final dashboardData = _processData(
