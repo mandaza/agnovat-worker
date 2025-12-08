@@ -330,7 +330,7 @@ class McpApiService {
       'title': title,
       if (description != null) 'description': description,
       'activity_type': activityType.toBackendString(),
-      if (status != null) 'status': status.name,
+      if (status != null) 'status': status.toBackendString(),
       if (goalIds != null) 'goal_ids': goalIds,
       if (outcomeNotes != null) 'outcome_notes': outcomeNotes,
     };
@@ -358,8 +358,8 @@ class McpApiService {
       'id': activityId,
       if (title != null) 'title': title,
       if (description != null) 'description': description,
-      if (activityType != null) 'activity_type': activityType.name,
-      if (status != null) 'status': status.name,
+      if (activityType != null) 'activity_type': activityType.toBackendString(),
+      if (status != null) 'status': status.toBackendString(),
       if (goalIds != null) 'goal_ids': goalIds,
       if (outcomeNotes != null) 'outcome_notes': outcomeNotes,
     };

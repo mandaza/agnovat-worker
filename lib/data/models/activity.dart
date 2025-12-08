@@ -89,7 +89,7 @@ class Activity extends Equatable {
       'title': title,
       'description': description,
       'activity_type': activityType.toBackendString(),
-      'status': status.name,
+      'status': status.toBackendString(),
       'goal_ids': goalIds,
       'outcome_notes': outcomeNotes,
       'created_at': createdAt.toIso8601String(),
@@ -120,10 +120,8 @@ class Activity extends Equatable {
   }
 
   static ActivityStatus _parseActivityStatus(String status) {
-    return ActivityStatus.values.firstWhere(
-      (e) => e.name == status,
-      orElse: () => ActivityStatus.scheduled,
-    );
+    // Try parsing from backend format first (snake_case)
+    return ActivityStatusExtension.fromBackendString(status);
   }
 
   @override
@@ -238,6 +236,40 @@ extension ActivityStatusExtension on ActivityStatus {
         return 'Cancelled';
       case ActivityStatus.noShow:
         return 'No Show';
+    }
+  }
+
+  /// Convert to backend format (snake_case)
+  String toBackendString() {
+    switch (this) {
+      case ActivityStatus.scheduled:
+        return 'scheduled';
+      case ActivityStatus.inProgress:
+        return 'in_progress';
+      case ActivityStatus.completed:
+        return 'completed';
+      case ActivityStatus.cancelled:
+        return 'cancelled';
+      case ActivityStatus.noShow:
+        return 'no_show';
+    }
+  }
+
+  /// Parse from backend format (snake_case)
+  static ActivityStatus fromBackendString(String status) {
+    switch (status) {
+      case 'scheduled':
+        return ActivityStatus.scheduled;
+      case 'in_progress':
+        return ActivityStatus.inProgress;
+      case 'completed':
+        return ActivityStatus.completed;
+      case 'cancelled':
+        return ActivityStatus.cancelled;
+      case 'no_show':
+        return ActivityStatus.noShow;
+      default:
+        return ActivityStatus.scheduled;
     }
   }
 }
