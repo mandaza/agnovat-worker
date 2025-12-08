@@ -26,12 +26,12 @@ class BehaviorReportsService {
     if (dateTo != null) args['date_to'] = dateTo;
     if (limit != null) args['limit'] = limit;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       'behaviorIncidents:list',
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) => BehaviorReport.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -129,12 +129,12 @@ class BehaviorReportsService {
     int days = 30,
     int limit = 10,
   }) async {
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       'behaviorIncidents:getRecentHighSeverity',
       args: {'days': days, 'limit': limit},
     );
 
-    return result
+    return (result ?? [])
         .map((json) => BehaviorReport.fromJson(json as Map<String, dynamic>))
         .toList();
   }

@@ -15,7 +15,7 @@ class ActivitySessionService {
   /// Calls Convex function: activitySessions:create
   Future<ActivitySession> createSession(ActivitySession session) async {
     try {
-      final result = await _convexClient.mutation<Map<String, dynamic>>(
+      final result = await _convexClient.mutation<Map<String, dynamic>?>(
         ApiConfig.activitySessionsCreate,
         args: {
           'activity_id': session.activityId,
@@ -116,12 +116,12 @@ class ActivitySessionService {
       if (dateTo != null) args['date_to'] = dateTo;
       if (minEngagement != null) args['min_engagement'] = minEngagement;
 
-      final result = await _convexClient.query<List<dynamic>>(
+      final result = await _convexClient.query<List<dynamic>?>(
         ApiConfig.activitySessionsList,
         args: args,
       );
 
-      return result
+      return (result ?? [])
           .map((json) => ActivitySession.fromJson(json as Map<String, dynamic>))
           .toList();
     } catch (e) {

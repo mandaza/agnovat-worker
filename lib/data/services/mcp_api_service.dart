@@ -52,12 +52,12 @@ class McpApiService {
     if (limit != null) args['limit'] = limit;
     if (offset != null) args['offset'] = offset;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.usersList,
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) => User.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -165,12 +165,12 @@ class McpApiService {
     if (limit != null) args['limit'] = limit;
     if (offset != null) args['offset'] = offset;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.clientsList,
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) {
           final jsonMap = json as Map<String, dynamic>;
           // If the data includes stats, return ClientWithStats
@@ -196,12 +196,12 @@ class McpApiService {
   /// Search clients by name
   /// Calls Convex function: clients:search
   Future<List<Client>> searchClients(String searchTerm) async {
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.clientsSearch,
       args: {'search_term': searchTerm},
     );
 
-    return result
+    return (result ?? [])
         .map((json) => Client.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -228,12 +228,12 @@ class McpApiService {
     if (limit != null) args['limit'] = limit;
     if (offset != null) args['offset'] = offset;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.activitiesList,
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) => Activity.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -267,12 +267,12 @@ class McpApiService {
     if (limit != null) args['limit'] = limit;
     if (offset != null) args['offset'] = offset;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.goalsList,
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) => Goal.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -371,12 +371,12 @@ class McpApiService {
     if (limit != null) args['limit'] = limit;
     if (clientId != null) args['client_id'] = clientId;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       ApiConfig.shiftNotesGetRecent,
       args: args,
     );
 
-    return result.cast<Map<String, dynamic>>();
+    return (result ?? []).cast<Map<String, dynamic>>();
   }
 
   /// List shift notes with filtering

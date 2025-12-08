@@ -34,12 +34,12 @@ class BehaviorIncidentReviewsService {
     if (severityAssessment != null) args['severity_assessment'] = severityAssessment;
     if (limit != null) args['limit'] = limit;
 
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       'behaviorIncidentReviews:list',
       args: args,
     );
 
-    return result
+    return (result ?? [])
         .map((json) => BehaviorIncidentReview.fromJson(json as Map<String, dynamic>))
         .toList();
   }
@@ -71,12 +71,12 @@ class BehaviorIncidentReviewsService {
   /// Calls: behaviorIncidentReviews:getUnacknowledgedForUser
   /// Now accepts clerk_id (string) instead of user_id (Convex ID)
   Future<List<BehaviorIncidentReview>> getUnacknowledgedForUser(String clerkId) async {
-    final result = await _convexClient.query<List<dynamic>>(
+    final result = await _convexClient.query<List<dynamic>?>(
       'behaviorIncidentReviews:getUnacknowledgedForUser',
       args: {'clerk_id': clerkId},
     );
 
-    return result
+    return (result ?? [])
         .map((json) => BehaviorIncidentReview.fromJson(json as Map<String, dynamic>))
         .toList();
   }

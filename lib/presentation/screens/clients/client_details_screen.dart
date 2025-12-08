@@ -11,11 +11,11 @@ import '../../providers/auth_provider.dart';
 /// Provider for client goals list
 final _goalsListProvider = FutureProvider.autoDispose.family<List<Goal>, String>((ref, clientId) async {
   final convexClient = ref.watch(convexClientProvider);
-  final result = await convexClient.query<List<dynamic>>(
+  final result = await convexClient.query<List<dynamic>?>(
     ApiConfig.goalsList,
     args: {'client_id': clientId, 'archived': false},
   );
-  return result.map((json) => Goal.fromJson(json as Map<String, dynamic>)).toList();
+  return (result ?? []).map((json) => Goal.fromJson(json as Map<String, dynamic>)).toList();
 });
 
 /// Provider for client activities list
