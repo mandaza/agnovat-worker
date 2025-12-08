@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/config/app_colors.dart';
 import '../../../data/models/user.dart';
+import '../../../data/models/activity_session.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/guardian_dashboard_provider.dart';
 import '../profile/profile_screen.dart';
