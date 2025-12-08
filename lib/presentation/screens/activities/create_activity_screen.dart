@@ -62,7 +62,7 @@ class _CreateActivityScreenState extends ConsumerState<CreateActivityScreen> {
       ]);
 
       final clients = results[0] as List<Client>;
-      final stakeholders = results[1] as List<dynamic>;
+      final stakeholders = results[1];
 
       setState(() {
         _clients = clients;
