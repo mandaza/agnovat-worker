@@ -3,6 +3,7 @@ import '../../core/providers/service_providers.dart';
 import '../../data/models/client.dart';
 import '../../data/models/activity.dart';
 import '../../data/models/goal.dart';
+import 'auth_provider.dart';
 
 /// Guardian Dashboard State
 class GuardianDashboardState {
@@ -137,11 +138,17 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
   final Ref ref;
 
   GuardianDashboardNotifier(this.ref) : super(const GuardianDashboardState()) {
-    loadDashboardData();
+    Future.microtask(() => loadDashboardData());
   }
 
   /// Load all admin dashboard data
   Future<void> loadDashboardData() async {
+    final auth = ref.read(authProvider);
+    if (!auth.isAuthenticated || auth.isLoggingOut) {
+      state = const GuardianDashboardState(isLoading: false, error: null, data: null);
+      return;
+    }
+
     state = state.copyWith(isLoading: true, error: null);
 
     try {
@@ -153,12 +160,21 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         apiService.listGoals(),
         apiService.listActivities(limit: 100),
         apiService.getRecentShiftNotes(limit: 20),
+        // Fetch all users and filter client-side to ensure accurate count
+        // This avoids potential backend filtering issues with role formats
+        apiService.listUsers(limit: 100),
       ]);
 
-      final clients = results[0] as List<Client>;
-      final goals = results[1] as List<Goal>;
-      final activities = results[2] as List<Activity>;
-      final shiftNotes = results[3] as List<Map<String, dynamic>>;
+      final clients = (results[0] as List<Client>?) ?? [];
+      final goals = (results[1] as List<Goal>?) ?? [];
+      final activities = (results[2] as List<Activity>?) ?? [];
+      final shiftNotes = (results[3] as List<Map<String, dynamic>>?) ?? [];
+      
+      final allUsers = (results[4] as List<dynamic>?)?.cast<User>() ?? [];
+      // Filter for active support workers
+      final supportWorkers = allUsers.where((u) => 
+        u.role == UserRole.supportWorker && u.active
+      ).toList();
 
       // Process data
       final dashboardData = _processData(
@@ -166,6 +182,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         goals: goals,
         activities: activities,
         shiftNotes: shiftNotes,
+        supportWorkers: supportWorkers,
       );
 
       state = state.copyWith(
@@ -186,10 +203,11 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
     required List<Goal> goals,
     required List<Activity> activities,
     required List<Map<String, dynamic>> shiftNotes,
+    required List<dynamic> supportWorkers,
   }) {
     // Calculate top stats
-    final activeGoals = goals.where((g) => g.status == GoalStatus.inProgress).length;
-    final supportWorkers = 8; // TODO: Fetch from users API when available
+    final activeGoals = goals.length; // Total count of all goals
+    final supportWorkersCount = supportWorkers.length; // Actual count of support workers
     final pendingReports = shiftNotes.where((n) => n['status'] == 'draft').length;
 
     // Goals progress - using progressPercentage (0-100)
@@ -277,7 +295,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
 
     return GuardianDashboardData(
       activeGoals: activeGoals,
-      supportWorkers: supportWorkers,
+      supportWorkers: supportWorkersCount,
       pendingReports: pendingReports,
       goalsOnTrack: goalsOnTrack,
       goalsBehind: goalsBehind,
