@@ -3,6 +3,7 @@ import '../../core/providers/service_providers.dart';
 import '../../data/models/client.dart';
 import '../../data/models/activity.dart';
 import '../../data/models/goal.dart';
+import '../../data/models/user.dart';
 import 'auth_provider.dart';
 
 /// Guardian Dashboard State
