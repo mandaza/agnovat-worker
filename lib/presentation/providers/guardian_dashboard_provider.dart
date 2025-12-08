@@ -161,8 +161,8 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         apiService.listGoals(),
         apiService.listActivities(limit: 100),
         apiService.getRecentShiftNotes(limit: 20),
-        // Fetch support workers specifically using snake_case as requested
-        apiService.listUsers(role: 'support_worker', limit: 100),
+        // Try listing stakeholders directly if listUsers fails or returns empty
+        apiService.listStakeholders(role: 'support_worker', limit: 100),
       ]);
 
       final clients = (results[0] as List<Client>?) ?? [];
@@ -170,13 +170,11 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
       final activities = (results[2] as List<Activity>?) ?? [];
       final shiftNotes = (results[3] as List<Map<String, dynamic>>?) ?? [];
       
-      final supportWorkers = (results[4] as List<dynamic>?)?.cast<User>() ?? [];
+      // Handle stakeholders result - might be List<dynamic> of maps, not User objects
+      final stakeholdersRaw = (results[4] as List<dynamic>?) ?? [];
+      final supportWorkersCount = stakeholdersRaw.length;
       
-      // Log for debugging
-      print('📊 Dashboard: Fetched ${supportWorkers.length} users with role=support_worker');
-      for (var u in supportWorkers) {
-        print('   - Worker: ${u.name}, Role: ${u.role}, Active: ${u.active}');
-      }
+      print('📊 Dashboard: Found $supportWorkersCount support workers via stakeholders:list');
 
       // Process data
       final dashboardData = _processData(
@@ -184,7 +182,7 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
         goals: goals,
         activities: activities,
         shiftNotes: shiftNotes,
-        supportWorkers: supportWorkers,
+        supportWorkersCount: supportWorkersCount,
       );
 
       state = state.copyWith(
@@ -205,11 +203,10 @@ class GuardianDashboardNotifier extends StateNotifier<GuardianDashboardState> {
     required List<Goal> goals,
     required List<Activity> activities,
     required List<Map<String, dynamic>> shiftNotes,
-    required List<dynamic> supportWorkers,
+    required int supportWorkersCount,
   }) {
     // Calculate top stats
     final activeGoals = goals.length; // Total count of all goals
-    final supportWorkersCount = supportWorkers.length; // Actual count of support workers
     final pendingReports = shiftNotes.where((n) => n['status'] == 'draft').length;
 
     // Goals progress - using progressPercentage (0-100)

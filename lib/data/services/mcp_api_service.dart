@@ -126,6 +126,30 @@ class McpApiService {
     );
   }
 
+  // ==================== STAKEHOLDERS ====================
+
+  /// List all stakeholders with optional filtering
+  /// Calls Convex function: stakeholders:list
+  Future<List<dynamic>> listStakeholders({
+    String? role,
+    bool? active,
+    int? limit,
+    int? offset,
+  }) async {
+    final args = <String, dynamic>{};
+    if (role != null) args['role'] = role;
+    if (active != null) args['active'] = active;
+    if (limit != null) args['limit'] = limit;
+    if (offset != null) args['offset'] = offset;
+
+    final result = await _convexClient.query<List<dynamic>?>(
+      ApiConfig.stakeholdersList,
+      args: args,
+    );
+
+    return result ?? [];
+  }
+
   // ==================== DASHBOARD ====================
 
   /// Get dashboard data with aggregated metrics
