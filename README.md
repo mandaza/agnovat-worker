@@ -1,6 +1,6 @@
 # agnovat_w
 
-Agnovat Support Worker
+Agnovat
 
 ## Getting Started
 

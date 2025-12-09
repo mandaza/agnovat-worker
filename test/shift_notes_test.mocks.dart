@@ -188,6 +188,24 @@ class MockMcpApiService extends _i1.Mock implements _i3.McpApiService {
           as _i8.Future<void>);
 
   @override
+  _i8.Future<List<dynamic>> listStakeholders({
+    String? role,
+    bool? active,
+    int? limit,
+    int? offset,
+  }) =>
+      (super.noSuchMethod(
+            Invocation.method(#listStakeholders, [], {
+              #role: role,
+              #active: active,
+              #limit: limit,
+              #offset: offset,
+            }),
+            returnValue: _i8.Future<List<dynamic>>.value(<dynamic>[]),
+          )
+          as _i8.Future<List<dynamic>>);
+
+  @override
   _i8.Future<_i3.DashboardData> getDashboard() =>
       (super.noSuchMethod(
             Invocation.method(#getDashboard, []),
@@ -318,7 +336,7 @@ class MockMcpApiService extends _i1.Mock implements _i3.McpApiService {
   @override
   _i8.Future<_i5.Activity> createActivity({
     required String? clientId,
-    required String? stakeholderId,
+    String? stakeholderId,
     required String? title,
     String? description,
     required _i5.ActivityType? activityType,

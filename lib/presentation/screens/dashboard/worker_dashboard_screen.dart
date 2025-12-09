@@ -9,7 +9,7 @@ import '../../utils/logout_helper.dart';
 import '../profile/profile_screen.dart';
 import '../clients/clients_list_screen.dart';
 import '../shift_notes/shift_notes_list_screen.dart';
-import '../shift_notes/create_shift_note_screen.dart';
+import '../shift_notes/unified_shift_note_wizard.dart';
 import '../reviews/unacknowledged_reviews_screen.dart';
 
 /// Worker Dashboard Screen
@@ -758,7 +758,7 @@ class WorkerDashboardScreen extends ConsumerWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => const CreateShiftNoteScreen(),
+                builder: (context) => const UnifiedShiftNoteWizard(),
               ),
             );
           },

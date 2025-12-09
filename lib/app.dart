@@ -8,6 +8,10 @@ import 'presentation/screens/dashboard/dashboard_router.dart';
 import 'presentation/widgets/auth_bootstrapper.dart';
 import 'presentation/providers/auth_provider.dart';
 
+/// Enable performance overlays for profiling
+/// Set to true to see FPS graphs, cached images, and offscreen layers
+const bool _enablePerformanceOverlay = false;
+
 /// Root application widget
 class AgnovatApp extends StatelessWidget {
   const AgnovatApp({super.key});
@@ -22,6 +26,11 @@ class AgnovatApp extends StatelessWidget {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.light,
+
+      // Performance Overlays (for profiling and optimization)
+      showPerformanceOverlay: _enablePerformanceOverlay,
+      checkerboardRasterCacheImages: _enablePerformanceOverlay,
+      checkerboardOffscreenLayers: _enablePerformanceOverlay,
 
       // No outer Scaffold here - let screens provide their own
       home: ClerkErrorListener(
